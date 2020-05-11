@@ -1,0 +1,62 @@
+import numpy as np
+
+from src import utils as ut
+
+
+class Dataset(object):
+    @staticmethod
+    def _id(x2id, x):
+        x2id[x] = x2id.get(x, len(x2id))
+        return x2id[x]
+
+    def _read(self, fn):
+        tups = []
+        with open(fn, 'r') as f:
+            for line in f.readlines():
+                s, r, o, t = line.strip().split('\t')
+                t = list(map(float, t.split('-')))
+                tups.append([self._id(self._e2id, s), self._id(self._r2id, r), self._id(self._e2id, o), *t])
+        return np.array(tups)
+
+    def __init__(self, ds):
+        self.loc = 0
+        self._e2id = {}
+        self._r2id = {}
+        self._ds = {'tr': self._read(f'data/{ds}/train.txt'),
+                    'vd': self._read(f'data/{ds}/valid.txt'),
+                    'ts':  self._read(f'data/{ds}/test.txt')}
+        self.ne = len(self._e2id)
+        self.nr = len(self._r2id)
+        self.al = set(map(tuple, np.concatenate(list(self._ds.values())).tolist()))
+
+    def __len__(self):
+        return len(self._ds['tr'])
+
+    def reset(self):
+        self.loc = 0
+
+    def _pos(self, bs):
+        if self.loc + bs <= len(self._ds['tr']):
+            pos = self._ds['tr'][self.loc:self.loc + bs]
+            self.loc += bs
+        else:
+            pos = self._ds['tr'][self.loc:]
+            self.loc = -1
+        return pos
+
+    def _neg(self, pos, nneg):
+        s_neg = np.repeat(pos, nneg + 1, axis=0)
+        o_neg = np.repeat(pos, nneg + 1, axis=0)
+        s_rnd = np.random.randint(1, self.ne, size=s_neg.shape[0])
+        o_rnd = np.random.randint(1, self.ne, size=o_neg.shape[0])
+        for i in range(s_neg.shape[0] // (nneg + 1)):
+            s_rnd[i * (nneg + 1)] = 0
+            o_rnd[i * (nneg + 1)] = 0
+        s_neg[:, 0] = (s_neg[:, 0] + s_rnd) % self.ne
+        o_neg[:, 2] = (o_neg[:, 2] + o_rnd) % self.ne
+        return np.concatenate((s_neg, o_neg), axis=0)
+
+    def next(self, bs, nneg, dvc):
+        pos = self._pos(bs)
+        neg = self._neg(pos, nneg)
+        return ut.shred(neg, dvc)
