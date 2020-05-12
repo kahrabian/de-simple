@@ -20,10 +20,13 @@ if __name__ == '__main__':
         logging.info(f'{k} = {v}')
 
     r = Runner(Dataset(args.dataset), args)
-    r.train()
+
+    if args.tr:
+        r.train()
 
     if args.ts:
         with torch.no_grad():
+            r.load()
             mtrs = r.test('ts')
             r.log_tensorboard('valid', mtrs, 0)
             logging.info(f'Test: {mtrs}')

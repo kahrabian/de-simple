@@ -18,7 +18,7 @@ class Runner(object):
         self.args = args
         self.ds = ds
         self.mdl = nn.DataParallel(getattr(models, args.model)(ds.ne, ds.nr, args))
-        self.mtr = -1
+        self.mtrs = None
         self.tb_sw = SummaryWriter()
 
     def log_tensorboard(self, chk, mtrs, e):
@@ -57,8 +57,11 @@ class Runner(object):
                 mtrs = self.test('vd')
                 self.log_tensorboard('valid', mtrs, e)
                 logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
-                if getattr(mtrs, self.args.mtr) > self.mtr:
+                if self.mtrs is None or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
+                    self.mtrs = mtrs
                     self.save(self.mdl, opt)
+
+        self.tb_sw.add_hparams(vars(args), self.mtrs)
 
     def _prepare(self, x, md):
         s, r, o, y, m, d = x
@@ -82,9 +85,15 @@ class Runner(object):
                 pb.update()
         return mtrs
 
-    def save(self, mdl, opt):
+    def load(self, opt=None):
+        chk = torch.load(os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))
+        self.mdl.load_state_dict(chk['mdl'])
+        if opt is not None:
+            opt.load_state_dict(chk['opt'])
+
+    def save(self, opt):
         with open(os.path.join(self.args.pth, 'cfg.json'), 'w') as f:
             json.dump(vars(self.args), f, indent=4, sort_keys=True)
-        torch.save({self.args.mtr: self.mtr,
-                    'mdl': mdl.state_dict(),
+        torch.save({**dict(self.mtrs),
+                    'mdl': self.mdl.state_dict(),
                     'opt': opt.state_dict()}, os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))

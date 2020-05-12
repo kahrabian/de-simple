@@ -56,6 +56,7 @@ def args():
     parser.add_argument('-drp', type=float, default=0.4)
     parser.add_argument('-vd_stp', type=int, default=20)
     parser.add_argument('-mtr', type=str, default='mrr', choices=['h_1', 'h_3', 'h_10', 'mr', 'mrr'])
+    parser.add_argument('-tr', action='store_true')
     parser.add_argument('-vd', action='store_true')
     parser.add_argument('-ts', action='store_true')
 
