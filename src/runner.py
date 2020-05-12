@@ -61,7 +61,7 @@ class Runner(object):
                     self.mtrs = mtrs
                     self.save(opt)
 
-        self.tb_sw.add_hparams(vars(args), self.mtrs)
+        self.tb_sw.add_hparams(vars(self.args), self.mtrs)
 
     def _prepare(self, x, md):
         s, r, o, y, m, d = x
