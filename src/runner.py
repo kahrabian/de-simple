@@ -18,7 +18,7 @@ class Runner(object):
         self.args = args
         self.ds = ds
         self.mdl = nn.DataParallel(getattr(models, args.model)(ds.ne, ds.nr, args))
-        self.mtrs = None
+        self.mtrs = ut.Metric()
         self.tb_sw = SummaryWriter()
 
     def log_tensorboard(self, chk, mtrs, e):
@@ -57,11 +57,11 @@ class Runner(object):
                 mtrs = self.test('vd')
                 self.log_tensorboard('valid', mtrs, e)
                 logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
-                if self.mtrs is None or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
+                if self.mtrs.cnt == 0 or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
                     self.mtrs = mtrs
                     self.save(opt)
 
-        self.tb_sw.add_hparams(vars(self.args), self.mtrs)
+        self.tb_sw.add_hparams(vars(self.args), dict(self.mtrs))
 
     def _prepare(self, x, md):
         s, r, o, y, m, d = x
