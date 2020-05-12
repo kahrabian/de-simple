@@ -46,7 +46,7 @@ class Runner(object):
                     tot_ls += ls.item()
 
                     stp += 1
-                    self.tb_sw.add_scalar(f'epoch/{e}/loss', ls.item(), stp)
+                    self.tb_sw.add_scalar(f'train/loss/{e}', ls.item(), stp)
                     pb.set_postfix(loss=f'{tot_ls / stp:.6f}')
                     pb.update()
 
