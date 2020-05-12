@@ -59,7 +59,7 @@ class Runner(object):
                 logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
                 if self.mtrs is None or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
                     self.mtrs = mtrs
-                    self.save(self.mdl, opt)
+                    self.save(opt)
 
         self.tb_sw.add_hparams(vars(args), self.mtrs)
 
