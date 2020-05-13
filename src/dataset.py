@@ -92,3 +92,13 @@ class Dataset(object):
         pn = self._neg(p, nneg)
         r_s, r_o = self._rel(pn, dvc)
         return ut.shred(pn, dvc) + ut.shred_rel(r_s, dvc) + ut.shred_rel(r_o, dvc)
+
+    def prepare(self, x, md, dvc):
+        s, r, o, y, m, d = x
+        if md == 's':
+            x_ts = [(i, r, o, y, m, d) for i in range(self.ne)]
+        if md == 'o':
+            x_ts = [(s, r, i, y, m, d) for i in range(self.ne)]
+        x_ts = np.array([tuple(x)] + list(set(x_ts) - self.al))
+        r_s, r_o = self._rel(x_ts, dvc)
+        return ut.shred(x_ts, dvc) + ut.shred_rel(r_s, dvc) + ut.shred_rel(r_o, dvc)

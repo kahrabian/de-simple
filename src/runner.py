@@ -64,21 +64,13 @@ class Runner(object):
 
         self.tb_sw.add_hparams(vars(self.args), dict(self.mtrs))
 
-    def _prepare(self, x, md):
-        s, r, o, y, m, d = x
-        if md == 's':
-            x_vd = [(i, r, o, y, m, d) for i in range(self.ds.ne)]
-        if md == 'o':
-            x_vd = [(s, r, i, y, m, d) for i in range(self.ds.ne)]
-        return ut.shred(np.array([tuple(x)] + list(set(x_vd) - self.ds.al)), self.args.dvc)
-
     def test(self, chk):
         self.mdl.eval()
         mtrs = ut.Metric()
         with tqdm(total=len(self.ds._ds[chk]), desc='valid' if chk == 'vd' else 'test') as pb:
             for x in self.ds._ds[chk]:
                 for md in ['s', 'o']:
-                    s, r, o, y, m, d = self._prepare(x, md)
+                    s, r, o, y, m, d, s_t, s_r, s_e, o_t, o_r, o_e = self.ds.prepare(x, md, self.args.dvc)
                     sc = self.mdl(s, r, o, y, m, d).detach().cpu().numpy()
                     rk = (sc > sc[0]).sum() + 1
                     mtrs.update(rk)
