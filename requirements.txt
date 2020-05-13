@@ -1,6 +1,7 @@
 autopep8
 ipython
 numpy
+pytz
 tensorflow
 tensorboard
 torch

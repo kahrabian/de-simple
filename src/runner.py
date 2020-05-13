@@ -3,7 +3,7 @@ import logging
 import os
 
 import numpy as np
-import torch
+import torch as T
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -17,7 +17,7 @@ class Runner(object):
     def __init__(self, ds, args):
         self.args = args
         self.ds = ds
-        self.mdl = nn.DataParallel(getattr(models, args.model)(ds.ne, ds.nr, args))
+        self.mdl = nn.DataParallel(getattr(models, self.args.model)(ds.ne, ds.nr, self.args))
         self.mtrs = ut.Metric()
         self.tb_sw = SummaryWriter()
 
@@ -26,7 +26,7 @@ class Runner(object):
             self.tb_sw.add_scalar(f'{chk}/{mtr}', val, e)
 
     def train(self):
-        opt = torch.optim.Adam(self.mdl.parameters(), lr=self.args.lr)
+        opt = T.optim.Adam(self.mdl.parameters(), lr=self.args.lr)
         ls_f = nn.CrossEntropyLoss()
 
         for e in range(1, self.args.ne + 1):
@@ -38,9 +38,10 @@ class Runner(object):
             with tqdm(total=int(np.ceil(len(self.ds) / self.args.bs)), desc=f'epoch {e}/{self.args.ne}') as pb:
                 while self.ds.loc >= 0:
                     opt.zero_grad()
-                    s, r, o, y, m, d = self.ds.next(self.args.bs, self.args.nneg, self.args.dvc)
+                    b = self.ds.next(self.args.bs, self.args.nneg, self.args.dvc)
+                    s, r, o, y, m, d, s_t, s_r, s_e, o_t, o_r, o_e = b
                     sc = self.mdl(s, r, o, y, m, d).view(-1, self.args.nneg + 1)
-                    ls = ls_f(sc, torch.zeros(sc.size(0)).long().to(self.args.dvc))
+                    ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
                     ls.backward()
                     opt.step()
                     tot_ls += ls.item()
@@ -86,7 +87,7 @@ class Runner(object):
         return mtrs
 
     def load(self, opt=None):
-        chk = torch.load(os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))
+        chk = T.load(os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))
         self.mdl.load_state_dict(chk['mdl'])
         if opt is not None:
             opt.load_state_dict(chk['opt'])
@@ -94,6 +95,6 @@ class Runner(object):
     def save(self, opt):
         with open(os.path.join(self.args.pth, 'cfg.json'), 'w') as f:
             json.dump(vars(self.args), f, indent=4, sort_keys=True)
-        torch.save({**dict(self.mtrs),
-                    'mdl': self.mdl.state_dict(),
-                    'opt': opt.state_dict()}, os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))
+        T.save({**dict(self.mtrs),
+                'mdl': self.mdl.state_dict(),
+                'opt': opt.state_dict()}, os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))

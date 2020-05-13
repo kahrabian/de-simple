@@ -1,4 +1,11 @@
+import bisect
+import pytz
+from collections import defaultdict
+from datetime import datetime
+
 import numpy as np
+import torch as T
+from torch.nn.utils.rnn import pad_sequence
 
 from src import utils as ut
 
@@ -18,6 +25,17 @@ class Dataset(object):
                 tups.append([self._id(self._e2id, s), self._id(self._r2id, r), self._id(self._e2id, o), *t])
         return np.array(tups)
 
+    def _ix(self):
+        ix = defaultdict(list)
+        for s, r, o, y, m, d in self._ds['tr'].astype(np.int):
+            t = datetime(year=y, month=m, day=d, tzinfo=pytz.utc).toordinal()
+            ix[s].append((t, r, o))
+            ix[-o - 1].append((t, r, o))
+        s_ix = defaultdict(lambda: np.array([[], ] * 3))
+        for k, v in ix.items():
+            s_ix[k] = np.array(sorted(v)).T
+        return s_ix
+
     def __init__(self, ds):
         self.loc = 0
         self._e2id = {}
@@ -25,6 +43,7 @@ class Dataset(object):
         self._ds = {'tr': self._read(f'data/{ds}/train.txt'),
                     'vd': self._read(f'data/{ds}/valid.txt'),
                     'ts':  self._read(f'data/{ds}/test.txt')}
+        self.ix = self._ix()
         self.ne = len(self._e2id)
         self.nr = len(self._r2id)
         self.al = set(map(tuple, np.concatenate(list(self._ds.values())).tolist()))
@@ -56,7 +75,20 @@ class Dataset(object):
         o_neg[:, 2] = (o_neg[:, 2] + o_rnd) % self.ne
         return np.concatenate((s_neg, o_neg), axis=0)
 
+    def _rel(self, neg, dvc):
+        r_s, r_o = [], []
+        for s, _, o, y, m, d in neg:
+            t = datetime(year=int(y), month=int(m), day=int(d), tzinfo=pytz.utc).toordinal()
+            s_ix = bisect.bisect_left(self.ix[s][0], t) - 1
+            o_ix = bisect.bisect_left(self.ix[-o - 1][0], t) - 1
+            r_s.append(T.from_numpy((self.ix[s][:, :s_ix] if s_ix != -1 else np.array([[], ] * 3)).T))
+            r_o.append(T.from_numpy((self.ix[-o - 1][:, :o_ix] if o_ix != -1 else np.array([[], ] * 3)).T))
+        r_s = pad_sequence(r_s).permute(1, 2, 0).numpy()
+        r_o = pad_sequence(r_o).permute(1, 2, 0).numpy()
+        return r_s, r_o
+
     def next(self, bs, nneg, dvc):
-        pos = self._pos(bs)
-        neg = self._neg(pos, nneg)
-        return ut.shred(neg, dvc)
+        p = self._pos(bs)
+        pn = self._neg(p, nneg)
+        r_s, r_o = self._rel(pn, dvc)
+        return ut.shred(pn, dvc) + ut.shred_rel(r_s, dvc) + ut.shred_rel(r_o, dvc)

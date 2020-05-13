@@ -1,7 +1,7 @@
 import logging
 import os
 
-import torch
+import torch as T
 
 from src import utils as ut
 from src.dataset import Dataset
@@ -10,7 +10,7 @@ from src.runner import Runner
 
 if __name__ == '__main__':
     args = ut.args()
-    args.dvc = 'cuda' if torch.cuda.is_available() else 'cpu'
+    args.dvc = 'cuda' if T.cuda.is_available() else 'cpu'
     args.pth = f'models/{args.dataset}_{args.model}_{args.id}'
 
     os.makedirs(args.pth, exist_ok=True)
@@ -25,7 +25,7 @@ if __name__ == '__main__':
         r.train()
 
     if args.ts:
-        with torch.no_grad():
+        with T.no_grad():
             r.load()
             mtrs = r.test('ts')
             r.log_tensorboard('valid', mtrs, 0)
