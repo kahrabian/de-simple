@@ -115,19 +115,19 @@ class DESimplE(nn.Module):
         r_o_s = pad_sequence(o_s_se).flip(0)
 
         m_s_s = None
-        for r_s_s_chk in T.chunk(r_s_s, np.ceil(r_s_s.size(0) / self.ql).astype(np.int), 0):
+        for r_s_s_chk in T.chunk(r_s_s, int(np.ceil(r_s_s.size(0) / self.ql)), 0):
             h_s_s, m_s_s = self.mt(r_s_s_chk, m_s_s)
 
         m_o_o = None
-        for r_o_o_chk in T.chunk(r_o_o, np.ceil(r_o_o.size(0) / self.ql).astype(np.int), 0):
+        for r_o_o_chk in T.chunk(r_o_o, int(np.ceil(r_o_o.size(0) / self.ql)), 0):
             h_o_o, m_o_o = self.mt(r_o_o_chk, m_o_o)
 
         m_s_o = None
-        for r_s_o_chk in T.chunk(r_s_o, np.ceil(r_s_o.size(0) / self.ql).astype(np.int), 0):
+        for r_s_o_chk in T.chunk(r_s_o, int(np.ceil(r_s_o.size(0) / self.ql)), 0):
             h_s_o, m_s_o = self.mt(r_s_o_chk, m_s_o)
 
         m_o_s = None
-        for r_o_s_chk in T.chunk(r_o_s, np.ceil(r_o_s.size(0) / self.ql).astype(np.int), 0):
+        for r_o_s_chk in T.chunk(r_o_s, int(np.ceil(r_o_s.size(0) / self.ql)), 0):
             h_o_s, m_o_s = self.mt(r_o_s_chk, m_o_s)
 
         return h_s_s[-1], h_o_o[-1], h_s_o[-1], h_o_s[-1]

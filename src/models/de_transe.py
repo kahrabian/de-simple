@@ -72,11 +72,11 @@ class DETransE(nn.Module):
         r_o = pad_sequence(o_re).flip(0)
 
         m_s = None
-        for r_s_chk in T.chunk(r_s, np.ceil(r_s.size(0) / self.ql).astype(np.int), 0):
+        for r_s_chk in T.chunk(r_s, int(np.ceil(r_s.size(0) / self.ql)), 0):
             h_s, m_s = self.mt(r_s_chk, m_s)
 
         m_o = None
-        for r_o_chk in T.chunk(r_o, np.ceil(r_o.size(0) / self.ql).astype(np.int), 0):
+        for r_o_chk in T.chunk(r_o, int(np.ceil(r_o.size(0) / self.ql)), 0):
             h_o, m_o = self.mt(r_o_chk, m_o)
 
         return h_s[-1], h_o[-1]
