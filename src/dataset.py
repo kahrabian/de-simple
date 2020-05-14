@@ -74,30 +74,30 @@ class Dataset(object):
         o_neg[:, 2] = (o_neg[:, 2] + o_rnd) % self.ne
         return np.concatenate((s_neg, o_neg), axis=0)
 
-    def _rel(self, neg, dvc):
+    def _rel(self, neg):
         r_s, r_o = [], []
         for s, _, o, y, m, d in neg:
             t = datetime(year=int(y), month=int(m), day=int(d), tzinfo=pytz.utc).toordinal()
             s_ix = bisect.bisect_left(self.ix[s][0], t) - 1
             o_ix = bisect.bisect_left(self.ix[-o - 1][0], t) - 1
-            r_s.append(ut.shred_rel((self.ix[s][:, :s_ix] if s_ix != -1 else np.array([[], ] * 3)).T, dvc))
-            r_o.append(ut.shred_rel((self.ix[-o - 1][:, :o_ix] if o_ix != -1 else np.array([[], ] * 3)).T, dvc))
+            r_s.append(ut.shred_rel((self.ix[s][:, :s_ix] if s_ix != -1 else np.array([[], ] * 3)).T))
+            r_o.append(ut.shred_rel((self.ix[-o - 1][:, :o_ix] if o_ix != -1 else np.array([[], ] * 3)).T))
         r_s = list(map(lambda x: x[0], r_s)), list(map(lambda x: x[1], r_s)), list(map(lambda x: x[2], r_s))
         r_o = list(map(lambda x: x[0], r_o)), list(map(lambda x: x[1], r_o)), list(map(lambda x: x[2], r_o))
         return r_s, r_o
 
-    def next(self, bs, nneg, dvc):
+    def next(self, bs, nneg):
         p = self._pos(bs)
         pn = self._neg(p, nneg)
-        r_s, r_o = self._rel(pn, dvc)
-        return ut.shred(pn, dvc) + r_s + r_o
+        r_s, r_o = self._rel(pn)
+        return ut.shred(pn) + r_s + r_o
 
-    def prepare(self, x, md, dvc):
+    def prepare(self, x, md):
         s, r, o, y, m, d = x
         if md == 's':
             x_ts = [(i, r, o, y, m, d) for i in range(self.ne)]
         if md == 'o':
             x_ts = [(s, r, i, y, m, d) for i in range(self.ne)]
         x_ts = np.array([tuple(x)] + list(set(x_ts) - self.al))
-        r_s, r_o = self._rel(x_ts, dvc)
-        return ut.shred(x_ts, dvc) + r_s + r_o
+        r_s, r_o = self._rel(x_ts)
+        return ut.shred(x_ts) + r_s + r_o

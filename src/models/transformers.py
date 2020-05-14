@@ -88,14 +88,14 @@ class MultiHeadAttn(nn.Module):
         w_k = w_k.view(k_l, -1, self.n_h, self.d_h)  # klen x bsz x n_head x d_head
         w_v = w_v.view(k_l, -1, self.n_h, self.d_h)  # klen x bsz x n_head x d_head
 
-        r_k = r_k.view(r_l, self.n_h, self.d_h)      # qlen x n_head x d_head
+        r_k = r_k.view(r_l, -1, self.n_h, self.d_h)  # qlen x bsz x n_head x d_head
 
         # compute attention score
         rw_q = w_q + r_w_b                                  # qlen x bsz x n_head x d_head
         ac = torch.einsum('ibnd,jbnd->bnij', (rw_q, w_k))   # bsz x n_head x qlen x klen
 
-        rr_q = w_q + r_r_b
-        bd = torch.einsum('ibnd,jnd->bnij', (rr_q, r_k))    # bsz x n_head x qlen x klen
+        rr_q = w_q + r_r_b                                  # qlen x bsz x n_head x d_head
+        bd = torch.einsum('ibnd,jbnd->bnij', (rr_q, r_k))   # bsz x n_head x qlen x klen
         bd = self._rel_shift(bd)
 
         # [bsz x n_head x qlen x klen]
@@ -176,7 +176,7 @@ class MemTransformerXL(nn.Module):
             _m = [torch.cat([m[i], h[i]], dim=0)[s_ix:e_ix].detach() for i in range(len(h))]
         return _m
 
-    def forward(self, sq, m):
+    def forward(self, sq, p, m):
         if m is None:
             m = self._m_init()
 
@@ -186,12 +186,14 @@ class MemTransformerXL(nn.Module):
 
         att_msk = torch.triu(sq.new_ones(q_l, k_l), 1 + m_l).bool()
 
-        # NOTE: Replace with time distance
-        p_sq = torch.arange(k_l - 1, -1, -1.0, device=sq.device, dtype=sq.dtype)
+        p = torch.arange(k_l - 1, -1, -1.0, device=sq.device, dtype=sq.dtype)
         if self.clm_l > 0:
-            p_sq.clamp_(max=self.clm_l)
-        p_emb = self.drp(self.p_emb(p_sq))
-        ##
+            p.clamp_(max=self.clm_l)
+        # p_emb = self.drp(self.p_emb(p.view(-1)).view(q_l, sq.size(1), -1))
+        # print(p_emb.shape)
+        p_emb = self.drp(self.p_emb(p))
+        # print(p_emb.shape)
+        # exit()
 
         h = self.drp(sq)
         hs = [h, ]

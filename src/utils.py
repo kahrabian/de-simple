@@ -77,18 +77,18 @@ def logger(args):
                         handlers=[logging.FileHandler(log_file, mode='w'), ])
 
 
-def shred(tup, dvc):
-    s = T.tensor(tup[:, 0]).long().to(dvc)
-    r = T.tensor(tup[:, 1]).long().to(dvc)
-    o = T.tensor(tup[:, 2]).long().to(dvc)
-    y = T.tensor(tup[:, 3]).float().to(dvc)
-    m = T.tensor(tup[:, 4]).float().to(dvc)
-    d = T.tensor(tup[:, 5]).float().to(dvc)
+def shred(tup):
+    s = T.tensor(tup[:, 0]).long()
+    r = T.tensor(tup[:, 1]).long()
+    o = T.tensor(tup[:, 2]).long()
+    y = T.tensor(tup[:, 3]).float()
+    m = T.tensor(tup[:, 4]).float()
+    d = T.tensor(tup[:, 5]).float()
     return s, r, o, y, m, d
 
 
-def shred_rel(tup, dvc):
-    t = T.tensor(tup[:, 0]).long().to(dvc)
-    r = T.tensor(tup[:, 1]).long().to(dvc)
-    e = T.tensor(tup[:, 2]).long().to(dvc)
+def shred_rel(tup):
+    t = T.tensor(tup[:, 0]).float()
+    r = T.tensor(tup[:, 1]).long()
+    e = T.tensor(tup[:, 2]).long()
     return t, r, e
