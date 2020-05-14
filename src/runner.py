@@ -40,7 +40,7 @@ class Runner(object):
                     opt.zero_grad()
                     b = self.ds.next(self.args.bs, self.args.nneg, self.args.dvc)
                     s, r, o, y, m, d, s_t, s_r, s_e, o_t, o_r, o_e = b
-                    sc = self.mdl(s, r, o, y, m, d).view(-1, self.args.nneg + 1)
+                    sc = self.mdl(s, r, o, y, m, d, s_t, s_r, s_e, o_t, o_r, o_e).view(-1, self.args.nneg + 1)
                     ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
                     ls.backward()
                     opt.step()
@@ -71,7 +71,7 @@ class Runner(object):
             for x in self.ds._ds[chk]:
                 for md in ['s', 'o']:
                     s, r, o, y, m, d, s_t, s_r, s_e, o_t, o_r, o_e = self.ds.prepare(x, md, self.args.dvc)
-                    sc = self.mdl(s, r, o, y, m, d).detach().cpu().numpy()
+                    sc = self.mdl(s, r, o, y, m, d, s_t, s_r, s_e, o_t, o_r, o_e).detach().cpu().numpy()
                     rk = (sc > sc[0]).sum() + 1
                     mtrs.update(rk)
                 pb.set_postfix(**dict(mtrs))

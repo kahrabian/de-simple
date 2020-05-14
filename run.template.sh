@@ -16,6 +16,10 @@ python main.py -id ${SLURM_JOB_ID} \
     -model DEDistMult \
     -s_dim 36 \
     -t_dim 64 \
+    -nl 4 \
+    -nh 8 \
+    -ql 32 \
+    -ml 64 \
     -ne 500 \
     -bs 512 \
     -lr 0.001 \

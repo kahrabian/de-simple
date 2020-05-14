@@ -5,7 +5,6 @@ from datetime import datetime
 
 import numpy as np
 import torch as T
-from torch.nn.utils.rnn import pad_sequence
 
 from src import utils as ut
 
@@ -81,17 +80,17 @@ class Dataset(object):
             t = datetime(year=int(y), month=int(m), day=int(d), tzinfo=pytz.utc).toordinal()
             s_ix = bisect.bisect_left(self.ix[s][0], t) - 1
             o_ix = bisect.bisect_left(self.ix[-o - 1][0], t) - 1
-            r_s.append(T.from_numpy((self.ix[s][:, :s_ix] if s_ix != -1 else np.array([[], ] * 3)).T))
-            r_o.append(T.from_numpy((self.ix[-o - 1][:, :o_ix] if o_ix != -1 else np.array([[], ] * 3)).T))
-        r_s = pad_sequence(r_s).permute(1, 2, 0).numpy()
-        r_o = pad_sequence(r_o).permute(1, 2, 0).numpy()
+            r_s.append(ut.shred_rel((self.ix[s][:, :s_ix] if s_ix != -1 else np.array([[], ] * 3)).T, dvc))
+            r_o.append(ut.shred_rel((self.ix[-o - 1][:, :o_ix] if o_ix != -1 else np.array([[], ] * 3)).T, dvc))
+        r_s = list(map(lambda x: x[0], r_s)), list(map(lambda x: x[1], r_s)), list(map(lambda x: x[2], r_s))
+        r_o = list(map(lambda x: x[0], r_o)), list(map(lambda x: x[1], r_o)), list(map(lambda x: x[2], r_o))
         return r_s, r_o
 
     def next(self, bs, nneg, dvc):
         p = self._pos(bs)
         pn = self._neg(p, nneg)
         r_s, r_o = self._rel(pn, dvc)
-        return ut.shred(pn, dvc) + ut.shred_rel(r_s, dvc) + ut.shred_rel(r_o, dvc)
+        return ut.shred(pn, dvc) + r_s + r_o
 
     def prepare(self, x, md, dvc):
         s, r, o, y, m, d = x
@@ -101,4 +100,4 @@ class Dataset(object):
             x_ts = [(s, r, i, y, m, d) for i in range(self.ne)]
         x_ts = np.array([tuple(x)] + list(set(x_ts) - self.al))
         r_s, r_o = self._rel(x_ts, dvc)
-        return ut.shred(x_ts, dvc) + ut.shred_rel(r_s, dvc) + ut.shred_rel(r_o, dvc)
+        return ut.shred(x_ts, dvc) + r_s + r_o
