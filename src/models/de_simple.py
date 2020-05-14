@@ -98,11 +98,21 @@ class DESimplE(nn.Module):
         return s_emb_s, r_emb_f, o_emb_o, o_emb_s, r_emb_i, s_emb_o
 
     def _r_emb(self, s_t, s_r, s_e, o_t, o_r, o_e):
-        r_s_s = pad_sequence(list(map(lambda x: T.cat([self.r_emb_f(x[0]), self.e_emb_o(x[1])], dim=1), zip(s_r, s_e))))
-        r_o_o = pad_sequence(list(map(lambda x: T.cat([self.r_emb_i(x[0]), self.e_emb_s(x[1])], dim=1), zip(o_r, o_e))))
+        s_s_re = list(map(lambda x: T.cat([self.r_emb_f(x[0].flip(0)),
+                                           self.e_emb_o(x[1].flip(0))], dim=1), zip(s_r, s_e)))
+        o_o_re = list(map(lambda x: T.cat([self.r_emb_i(x[0].flip(0)),
+                                           self.e_emb_s(x[1].flip(0))], dim=1), zip(o_r, o_e)))
 
-        r_s_o = pad_sequence(list(map(lambda x: T.cat([self.r_emb_f(x[0]), self.e_emb_o(x[1])], dim=1), zip(o_r, o_e))))
-        r_o_s = pad_sequence(list(map(lambda x: T.cat([self.r_emb_i(x[0]), self.e_emb_s(x[1])], dim=1), zip(s_r, s_e))))
+        r_s_s = pad_sequence(s_s_re).flip(0)
+        r_o_o = pad_sequence(o_o_re).flip(0)
+
+        s_o_se = list(map(lambda x: T.cat([self.r_emb_f(x[0].flip(0)),
+                                           self.e_emb_o(x[1].flip(0))], dim=1), zip(o_r, o_e)))
+        o_s_se = list(map(lambda x: T.cat([self.r_emb_i(x[0].flip(0)),
+                                           self.e_emb_s(x[1].flip(0))], dim=1), zip(s_r, s_e)))
+
+        r_s_o = pad_sequence(s_o_se).flip(0)
+        r_o_s = pad_sequence(o_s_se).flip(0)
 
         m_s_s = None
         for r_s_s_chk in T.chunk(r_s_s, np.ceil(r_s_s.size(0) / self.ql).astype(np.int), 0):

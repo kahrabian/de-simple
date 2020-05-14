@@ -65,8 +65,11 @@ class DEDistMult(nn.Module):
         return s_emb, r_emb, o_emb
 
     def _r_emb(self, s_t, s_r, s_e, o_t, o_r, o_e):
-        r_s = pad_sequence(list(map(lambda x: T.cat([self.r_emb(x[0]), self.e_emb(x[1])], dim=1), zip(s_r, s_e))))
-        r_o = pad_sequence(list(map(lambda x: T.cat([self.r_emb(x[0]), self.e_emb(x[1])], dim=1), zip(o_r, o_e))))
+        s_re = list(map(lambda x: T.cat([self.r_emb(x[0].flip(0)), self.e_emb(x[1].flip(0))], dim=1), zip(s_r, s_e)))
+        o_re = list(map(lambda x: T.cat([self.r_emb(x[0].flip(0)), self.e_emb(x[1].flip(0))], dim=1), zip(o_r, o_e)))
+
+        r_s = pad_sequence(s_re).flip(0)
+        r_o = pad_sequence(o_re).flip(0)
 
         m_s = None
         for r_s_chk in T.chunk(r_s, np.ceil(r_s.size(0) / self.ql).astype(np.int), 0):
