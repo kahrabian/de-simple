@@ -122,7 +122,7 @@ class Dataset(tDataset):
         return self._shred(pn) + self._shred_rel(r_s) + self._shred_rel(r_o)
 
     def prepare(self, x, md):
-        mem_k = mem_k
+        mem_k = (md,) + x
         if mem_k in self.mem:
             x_ts = self.mem[mem_k]
         else:
