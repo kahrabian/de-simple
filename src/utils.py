@@ -70,3 +70,7 @@ def logger(args):
                         level=logging.INFO,
                         datefmt='%Y-%m-%d %H:%M:%S',
                         handlers=[logging.FileHandler(log_file, mode='w'), ])
+
+
+def to(dvc, *t):
+    return list(map(lambda x: x.to(dvc), t))

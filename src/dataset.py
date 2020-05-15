@@ -52,7 +52,6 @@ class Dataset(tDataset):
         self.nr = len(self.r2id)
         self.ix = self._ix()
         self.al = set(map(tuple, np.concatenate(list(self.chk.values())).tolist()))
-        self.dvc = args.dvc
 
     def __len__(self):
         return len(self.chk['tr'])
@@ -83,17 +82,17 @@ class Dataset(tDataset):
         return np.array(r_s), np.array(r_o)
 
     def _shred(self, tup):
-        s = T.tensor(tup[:, 0]).long().to(self.dvc)
-        r = T.tensor(tup[:, 1]).long().to(self.dvc)
-        o = T.tensor(tup[:, 2]).long().to(self.dvc)
-        y = T.tensor(tup[:, 3]).float().to(self.dvc)
-        m = T.tensor(tup[:, 4]).float().to(self.dvc)
-        d = T.tensor(tup[:, 5]).float().to(self.dvc)
+        s = T.tensor(tup[:, 0]).long()
+        r = T.tensor(tup[:, 1]).long()
+        o = T.tensor(tup[:, 2]).long()
+        y = T.tensor(tup[:, 3]).float()
+        m = T.tensor(tup[:, 4]).float()
+        d = T.tensor(tup[:, 5]).float()
         return s, r, o, y, m, d
 
     def _shred_rel(self, tup):
-        t = T.tensor(tup[:, :, 0]).float().to(self.dvc)
-        e = T.tensor(tup[:, :, 1]).long().to(self.dvc)
+        t = T.tensor(tup[:, :, 0]).float()
+        e = T.tensor(tup[:, :, 1]).long()
         return t, e
 
     def __getitem__(self, i):

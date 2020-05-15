@@ -38,8 +38,9 @@ class Runner(object):
 
             tot_ls = 0.0
             with tqdm(total=len(self.dl), desc=f'epoch {e}/{self.args.ne}') as pb:
-                for i, (s, r, o, y, m, d, s_t, s_e, o_t, o_e) in enumerate(self.dl, 1):
+                for i, x in enumerate(self.dl, 1):
                     opt.zero_grad()
+                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, *x)
                     sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.args.nneg + 1)
                     ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
                     ls.backward()
@@ -69,7 +70,7 @@ class Runner(object):
         with tqdm(total=len(self.ds.chk[chk]), desc='valid' if chk == 'vd' else 'test') as pb:
             for x in self.ds.chk[chk]:
                 for md in ['s', 'o']:
-                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = self.ds.prepare(x, md)
+                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, *self.ds.prepare(x, md))
                     sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
                     rk = (sc > sc[0]).sum() + 1
                     mtrs.update(rk)
