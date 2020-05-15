@@ -12,3 +12,4 @@ runs
 logs
 
 run.sh
+!src/models
