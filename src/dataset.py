@@ -121,8 +121,8 @@ class Dataset(tDataset):
         return self._shred(pn) + self._shred_rel(r_s) + self._shred_rel(r_o)
 
     def prepare(self, x, md):
-        if (md, x) in self.mem:
-            x_ts = self.mem[(md, x)]
+        if (md,) + x in self.mem:
+            x_ts = self.mem[(md,) + x]
         else:
             s, r, o, y, m, d = x
             if md == 's':
@@ -130,6 +130,6 @@ class Dataset(tDataset):
             if md == 'o':
                 x_ts = [(s, r, i, y, m, d) for i in range(self.ne)]
             x_ts = np.array([tuple(x)] + list(set(x_ts) - self.al))
-            self.mem[(md, x)] = x_ts
+            self.mem[(md,) + x] = x_ts
         r_s, r_o = self._rel(x_ts)
         return self._shred(x_ts) + self._shred_rel(r_s) + self._shred_rel(r_o)
