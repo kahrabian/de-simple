@@ -26,14 +26,17 @@ class Dataset(object):
         return np.array(tups)
 
     def _ix(self):
-        ix = defaultdict(list)
+        ix = defaultdict(lambda: defaultdict(list))
         for s, r, o, y, m, d in self._ds['tr'].astype(np.int):
             t = datetime(year=y, month=m, day=d, tzinfo=pytz.utc).toordinal()
-            ix[s].append((t, r, o))
-            ix[-o - 1].append((t, r, o))
-        s_ix = defaultdict(lambda: np.array([[], ] * 3))
-        for k, v in ix.items():
-            s_ix[k] = np.array(sorted(v)).T
+            ix[s][r].append((t, o))
+            ix[o][r].append((t, s))  # NOTE: Could have a different list here (-o - 1)
+        s_ix = defaultdict(lambda: defaultdict(lambda: {'t': [], 'e': []}))
+        for k in ix:
+            for r in ix[k]:
+                s_r = sorted(set(ix[k][r]))
+                s_ix[k][r]['t'] = list(map(lambda x: x[0], s_r))
+                s_ix[k][r]['e'] = list(map(lambda x: x[1], s_r))
         return s_ix
 
     def __init__(self, ds):
@@ -78,14 +81,15 @@ class Dataset(object):
     def _rel(self, neg, dvc):
         r_s, r_o = [], []
         for s, _, o, y, m, d in neg:
+            r_s.append([])
+            r_o.append([])
             t = datetime(year=int(y), month=int(m), day=int(d), tzinfo=pytz.utc).toordinal()
-            s_ix = bisect.bisect_left(self.ix[s][0], t) - 1
-            o_ix = bisect.bisect_left(self.ix[-o - 1][0], t) - 1
-            r_s.append(T.from_numpy((self.ix[s][:, :s_ix] if s_ix != -1 else np.array([[], ] * 3)).T))
-            r_o.append(T.from_numpy((self.ix[-o - 1][:, :o_ix] if o_ix != -1 else np.array([[], ] * 3)).T))
-        r_s = pad_sequence(r_s).permute(1, 2, 0).numpy()
-        r_o = pad_sequence(r_o).permute(1, 2, 0).numpy()
-        return r_s, r_o
+            for r in range(self.nr):
+                s_ix = bisect.bisect_left(self.ix[s][r]['t'], t) - 1
+                o_ix = bisect.bisect_left(self.ix[o][r]['t'], t) - 1
+                r_s[-1].append((self.ix[s][r]['t'][s_ix], self.ix[s][r]['e'][s_ix]) if s_ix != -1 else (-1, -1))
+                r_o[-1].append((self.ix[o][r]['t'][o_ix], self.ix[o][r]['e'][o_ix]) if o_ix != -1 else (-1, -1))
+        return np.array(r_s), np.array(r_o)
 
     def next(self, bs, nneg, dvc):
         p = self._pos(bs)

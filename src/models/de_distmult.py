@@ -1,6 +1,8 @@
-import torch
+import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
+
+from src.models.embedding import PositionalEmbedding
 
 
 class DEDistMult(nn.Module):
@@ -34,7 +36,29 @@ class DEDistMult(nn.Module):
         nn.init.xavier_uniform_(self.d_amp.weight)
         nn.init.xavier_uniform_(self.y_amp.weight)
 
-        self.t_nl = torch.sin
+        self.p_emb = PositionalEmbedding(args.r_dim)
+        self.p_proj = nn.Linear(nr, 1, bias=False)
+        nn.init.xavier_uniform_(self.p_proj.weight)
+
+        self.r_proj = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim + args.t_dim + args.s_dim * 2))
+        nn.init.xavier_uniform_(self.r_proj)
+
+        self.pr_emb = nn.Embedding(nr, args.r_dim + args.t_dim + args.s_dim * 2).to(args.dvc)
+        nn.init.xavier_uniform_(self.r_emb.weight)
+
+        self.t_nl = T.sin
+
+    def _p_emb(self, t, e):
+        msk = ((t == -1) & (e == -1))  # NOTE: Unavailable relations
+        msk.requires_grad = False
+
+        t_emb = self.p_emb(t.view(-1) + msk.view(-1).long()).view(t.size(0), -1, t.size(1))
+        r_emb = self.r_emb.weight.permute(1, 0).repeat(t.size(0), 1, 1)
+        e_emb = self.e_emb(e.view(-1) + msk.view(-1).long()).view(e.size(0), -1, e.size(1))
+        emb = T.cat([t_emb, r_emb, e_emb], dim=1)
+        emb[msk.unsqueeze(1).repeat(1, emb.size(1), 1)] = 0
+
+        return emb
 
     def t_emb(self, e, y, m, d):
         y_emb = self.y_amp(e) * self.t_nl(self.y_frq(e) * y + self.y_phi(e))
@@ -46,17 +70,27 @@ class DEDistMult(nn.Module):
     def emb(self, s, r, o, y, m, d):
         y, m, d = y.view(-1, 1), m.view(-1, 1), d.view(-1, 1)
 
-        s_emb = torch.cat((self.e_emb(s), self.t_emb(s, y, m, d)), 1)
-        o_emb = torch.cat((self.e_emb(o), self.t_emb(o, y, m, d)), 1)
+        s_emb = T.cat((self.e_emb(s), self.t_emb(s, y, m, d)), 1)
+        o_emb = T.cat((self.e_emb(o), self.t_emb(o, y, m, d)), 1)
         r_emb = self.r_emb(r)
 
         return s_emb, r_emb, o_emb
 
-    def forward(self, s, r, o, y, m, d):
+    def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb, r_emb, o_emb = self.emb(s, r, o, y, m, d)
 
-        sc = (s_emb * r_emb) * o_emb
+        s_p_emb, o_p_emb = self._p_emb(s_t, s_e), self._p_emb(o_t, o_e)
+
+        p_emb_s = self.p_proj(s_p_emb).squeeze()
+        p_emb_o = self.p_proj(o_p_emb).squeeze()
+
+        w_r = T.index_select(self.r_proj, dim=0, index=r)
+
+        sc = T.cat([(s_emb * r_emb) * o_emb,
+                    T.einsum('be,bpe->bp', (p_emb_s, w_r)),
+                    T.einsum('be,bpe->bp', (p_emb_o, w_r)),
+                    (p_emb_s * self.pr_emb(r)) * p_emb_o], dim=1)
         sc = F.dropout(sc, p=self.drp, training=self.training)
-        sc = torch.sum(sc, dim=1)
+        sc = T.sum(sc, dim=1)
 
         return sc

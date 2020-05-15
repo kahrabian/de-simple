@@ -1,9 +1,9 @@
-import torch
+import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-class DESimplE(torch.nn.Module):
+class DESimplE(nn.Module):
     def __init__(self, ne, nr, args):
         super(DESimplE, self).__init__()
         self.drp = args.drp
@@ -56,7 +56,7 @@ class DESimplE(torch.nn.Module):
         nn.init.xavier_uniform_(self.d_amp_o.weight)
         nn.init.xavier_uniform_(self.y_amp_o.weight)
 
-        self.t_nl = torch.sin
+        self.t_nl = T.sin
 
     def t_emb_s(self, e, y, m, d):
         y_emb = self.y_amp_s(e) * self.t_nl(self.y_frq_s(e) * y + self.y_phi_s(e))
@@ -75,21 +75,21 @@ class DESimplE(torch.nn.Module):
     def emb(self, s, r, o, y, m, d):
         y, m, d = y.view(-1, 1), m.view(-1, 1), d.view(-1, 1)
 
-        s_emb_s = torch.cat((self.e_emb_s(s), self.t_emb_s(s, y, m, d)), 1)
-        o_emb_o = torch.cat((self.e_emb_o(o), self.t_emb_o(o, y, m, d)), 1)
+        s_emb_s = T.cat((self.e_emb_s(s), self.t_emb_s(s, y, m, d)), 1)
+        o_emb_o = T.cat((self.e_emb_o(o), self.t_emb_o(o, y, m, d)), 1)
         r_emb_f = self.r_emb_f(r)
 
-        o_emb_s = torch.cat((self.e_emb_s(o), self.t_emb_s(o, y, m, d)), 1)
-        s_emb_o = torch.cat((self.e_emb_o(s), self.t_emb_o(s, y, m, d)), 1)
+        o_emb_s = T.cat((self.e_emb_s(o), self.t_emb_s(o, y, m, d)), 1)
+        s_emb_o = T.cat((self.e_emb_o(s), self.t_emb_o(s, y, m, d)), 1)
         r_emb_i = self.r_emb_i(r)
 
         return s_emb_s, r_emb_f, o_emb_o, o_emb_s, r_emb_i, s_emb_o
 
-    def forward(self, s, r, o, y, m, d):
+    def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb_s, r_emb_f, o_emb_o, o_emb_s, r_emb_i, s_emb_o = self.emb(s, r, o, y, m, d)
 
         sc = ((s_emb_s * r_emb_f) * o_emb_o + (o_emb_s * r_emb_i) * s_emb_o) / 2.0
         sc = F.dropout(sc, p=self.drp, training=self.training)
-        sc = torch.sum(sc, dim=1)
+        sc = T.sum(sc, dim=1)
 
         return sc

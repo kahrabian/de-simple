@@ -47,8 +47,9 @@ def args():
     parser.add_argument('-id', type=str, required=True)
     parser.add_argument('-dataset', type=str, default='icews14', choices=['gdelt', 'icews14', 'icews05-15'])
     parser.add_argument('-model', type=str, default='DEDistMult', choices=['DEDistMult', 'DETransE', 'DESimplE'])
-    parser.add_argument('-s_dim', type=int, default=36)
+    parser.add_argument('-s_dim', type=int, default=20)
     parser.add_argument('-t_dim', type=int, default=64)
+    parser.add_argument('-r_dim', type=int, default=16)
     parser.add_argument('-ne', type=int, default=500)
     parser.add_argument('-bs', type=int, default=512)
     parser.add_argument('-lr', type=float, default=0.001)
@@ -82,7 +83,6 @@ def shred(tup, dvc):
 
 
 def shred_rel(tup, dvc):
-    t = T.tensor(tup[:, 0]).long().to(dvc)
-    r = T.tensor(tup[:, 1]).long().to(dvc)
-    e = T.tensor(tup[:, 2]).long().to(dvc)
-    return t, r, e
+    t = T.tensor(tup[:, :, 0]).float().to(dvc)
+    e = T.tensor(tup[:, :, 1]).long().to(dvc)
+    return t, e

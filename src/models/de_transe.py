@@ -1,6 +1,8 @@
-import torch
+import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
+
+from src.models.embedding import PositionalEmbedding
 
 
 class DETransE(nn.Module):
@@ -34,7 +36,7 @@ class DETransE(nn.Module):
         nn.init.xavier_uniform_(self.d_amp.weight)
         nn.init.xavier_uniform_(self.y_amp.weight)
 
-        self.t_nl = torch.sin
+        self.t_nl = T.sin
 
     def t_emb(self, e, y, m, d):
         y_emb = self.y_amp(e) * self.t_nl(self.y_frq(e) * y + self.y_phi(e))
@@ -46,17 +48,17 @@ class DETransE(nn.Module):
     def emb(self, s, r, o, y, m, d):
         y, m, d = y.view(-1, 1), m.view(-1, 1), d.view(-1, 1)
 
-        s_emb = torch.cat((self.e_emb(s), self.t_emb(s, y, m, d)), 1)
-        o_emb = torch.cat((self.e_emb(o), self.t_emb(o, y, m, d)), 1)
+        s_emb = T.cat((self.e_emb(s), self.t_emb(s, y, m, d)), 1)
+        o_emb = T.cat((self.e_emb(o), self.t_emb(o, y, m, d)), 1)
         r_emb = self.r_emb(r)
 
         return s_emb, r_emb, o_emb
 
-    def forward(self, s, r, o, y, m, d):
+    def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb, r_emb, o_emb = self.emb(s, r, o, y, m, d)
 
         sc = (s_emb + r_emb) - o_emb
         sc = F.dropout(sc, p=self.drp, training=self.training)
-        sc = (-1) * torch.norm(sc, dim=1)
+        sc = (-1) * T.norm(sc, dim=1)
 
         return sc
