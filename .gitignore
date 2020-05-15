@@ -6,10 +6,13 @@ checkpoint
 .vscode
 .ipynb_checkpoints
 **/__pycache__
-models
 data
-runs
 logs
+memory
+models
+runs
 
 run.sh
 !src/models
+
+!**/PLACEHOLDER

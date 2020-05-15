@@ -7,6 +7,7 @@ import shutil
 import numpy as np
 import torch as T
 import torch.nn as nn
+import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -70,18 +71,22 @@ class Runner(object):
         self.tb_sw.add_hparams(vars(self.args), dict(self.mtrs))
 
     def test(self, chk):
+        logging.info(f'started loading {chk} chunk')
+        with mp.Pool(os.cpu_count()) as p:
+            x_ts = p.map(self.ds.prepare, self.ds.chk[chk][:3])
+        self.save_mem()
+        logging.info(f'finished loading {chk} chunk')
+
         self.mdl.eval()
         mtrs = ut.Metric()
         with tqdm(total=len(self.ds.chk[chk]), desc='valid' if chk == 'vd' else 'test') as pb:
-            for x in self.ds.chk[chk]:
-                for md in ['s', 'o']:
-                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, self.ds.prepare(tuple(x), md))
-                    sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
-                    rk = (sc > sc[0]).sum() + 1
-                    mtrs.update(rk)
-                self.save_mem()
-                pb.set_postfix(**dict(mtrs))
-                pb.update()
+            for x in x_ts:
+                s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
+                sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
+                rk = (sc > sc[0]).sum() + 1
+                mtrs.update(rk)
+            pb.set_postfix(**dict(mtrs))
+            pb.update()
         return mtrs
 
     def load(self, opt=None):
