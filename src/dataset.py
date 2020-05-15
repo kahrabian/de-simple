@@ -85,13 +85,14 @@ class Dataset(tDataset):
         return datetime(year=int(x[0]), month=int(x[1]), day=int(x[2]), tzinfo=pytz.utc).toordinal()
 
     def _rel_e_map(self, x):
-        if (x[0], x[1]) in self.mem:
-            return self.mem[(x[0], x[1])]
+        mem_k = (x[0], x[1])
+        if mem_k in self.mem:
+            return self.mem[mem_k]
         r_e = []
         for r in range(self.nr):
             e_ix = bisect.bisect_left(self.ix[x[0]][r]['t'], x[1]) - 1
             r_e.append((self.ix[x[0]][r]['t'][e_ix], self.ix[x[0]][r]['e'][e_ix]) if e_ix != -1 else (-1, -1))
-        self.mem[(x[0], x[1])] = r_e
+        self.mem[mem_k] = r_e
         return r_e
 
     def _rel(self, neg):
@@ -121,8 +122,9 @@ class Dataset(tDataset):
         return self._shred(pn) + self._shred_rel(r_s) + self._shred_rel(r_o)
 
     def prepare(self, x, md):
-        if (md,) + x in self.mem:
-            x_ts = self.mem[(md,) + x]
+        mem_k = mem_k
+        if mem_k in self.mem:
+            x_ts = self.mem[mem_k]
         else:
             s, r, o, y, m, d = x
             if md == 's':
@@ -130,6 +132,6 @@ class Dataset(tDataset):
             if md == 'o':
                 x_ts = [(s, r, i, y, m, d) for i in range(self.ne)]
             x_ts = np.array([tuple(x)] + list(set(x_ts) - self.al))
-            self.mem[(md,) + x] = x_ts
+            self.mem[mem_k] = x_ts
         r_s, r_o = self._rel(x_ts)
         return self._shred(x_ts) + self._shred_rel(r_s) + self._shred_rel(r_o)
