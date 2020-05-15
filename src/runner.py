@@ -22,7 +22,7 @@ class Runner(object):
         self.args = args
         self.mem = self.load_mem()
         self.ds = Dataset(self.mem, self.args)
-        self.dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=0,  # os.cpu_count(),
+        self.dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=os.cpu_count(),
                              pin_memory=True, collate_fn=Dataset.collate_fn)
         self.mdl = nn.DataParallel(getattr(models, self.args.model)(self.ds.ne, self.ds.nr, self.args))
         self.mtrs = ut.Metric()
