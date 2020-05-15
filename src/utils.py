@@ -72,5 +72,5 @@ def logger(args):
                         handlers=[logging.FileHandler(log_file, mode='w'), ])
 
 
-def to(dvc, *t):
-    return list(map(lambda x: x.to(dvc), t))
+def to(dvc, ts):
+    return [t.to(dvc) for t in ts]

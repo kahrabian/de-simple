@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import pickle
+import shutil
 
 import numpy as np
 import torch as T
@@ -18,9 +20,10 @@ from src.dataset import Dataset
 class Runner(object):
     def __init__(self, args):
         self.args = args
-        self.ds = Dataset(self.args)
-        self.dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=os.cpu_count(),
-                             pin_memory=True, collate_fn=lambda x: [T.cat([_[i] for _ in x]) for i in range(len(x[0]))])
+        self.mem = self.load_mem()
+        self.ds = Dataset(self.mem, self.args)
+        self.dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=0,  # os.cpu_count(),
+                             pin_memory=True, collate_fn=Dataset.collate_fn)
         self.mdl = nn.DataParallel(getattr(models, self.args.model)(self.ds.ne, self.ds.nr, self.args))
         self.mtrs = ut.Metric()
         self.tb_sw = SummaryWriter()
@@ -40,7 +43,7 @@ class Runner(object):
             with tqdm(total=len(self.dl), desc=f'epoch {e}/{self.args.ne}') as pb:
                 for i, x in enumerate(self.dl, 1):
                     opt.zero_grad()
-                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, *x)
+                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
                     sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.args.nneg + 1)
                     ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
                     ls.backward()
@@ -51,11 +54,13 @@ class Runner(object):
                     pb.set_postfix(loss=f'{tot_ls / i:.6f}')
                     pb.update()
 
+            self.save_mem()
             self.log_tensorboard('train', {'loss': tot_ls / len(self.dl)}, e)
             logging.info(f'epoch {e}/{self.args.ne}: loss={tot_ls / len(self.dl):.6f}')
 
             if self.args.vd and (e % self.args.vd_stp == 0 or e == self.args.ne):
                 mtrs = self.test('vd')
+                self.save_mem()
                 self.log_tensorboard('valid', mtrs, e)
                 logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
                 if self.mtrs.cnt == 0 or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
@@ -70,10 +75,11 @@ class Runner(object):
         with tqdm(total=len(self.ds.chk[chk]), desc='valid' if chk == 'vd' else 'test') as pb:
             for x in self.ds.chk[chk]:
                 for md in ['s', 'o']:
-                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, *self.ds.prepare(x, md))
+                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, self.ds.prepare(tuple(x), md))
                     sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
                     rk = (sc > sc[0]).sum() + 1
                     mtrs.update(rk)
+                self.save_mem()
                 pb.set_postfix(**dict(mtrs))
                 pb.update()
         return mtrs
@@ -90,3 +96,14 @@ class Runner(object):
         T.save({**dict(self.mtrs),
                 'mdl': self.mdl.state_dict(),
                 'opt': opt.state_dict()}, os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))
+
+    def load_mem(self):
+        if not os.path.exists(self.args.mem_pth):
+            return {}
+        with open(self.args.mem_pth, 'rb') as f:
+            return pickle.load(f)
+
+    def save_mem(self):
+        with open(self.args.mem_pth + '_tmp', 'wb') as f:
+            pickle.dump(self.mem, f, protocol=pickle.HIGHEST_PROTOCOL)
+        shutil.copy(self.args.mem_pth + '_tmp', self.args.mem_pth)

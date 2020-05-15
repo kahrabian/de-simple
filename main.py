@@ -11,6 +11,7 @@ if __name__ == '__main__':
     args = ut.args()
     args.dvc = 'cuda' if T.cuda.is_available() else 'cpu'
     args.pth = f'models/{args.dataset}_{args.model}_{args.id}'
+    args.mem_pth = f'memory/{args.dataset}.pkl'
 
     os.makedirs(args.pth, exist_ok=True)
     ut.logger(args)
