@@ -5,19 +5,23 @@ import os
 import numpy as np
 import torch as T
 import torch.nn as nn
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 
 import src.utils as ut
 from src import models
+from src.dataset import Dataset
 
 
 class Runner(object):
-    def __init__(self, ds, args):
+    def __init__(self, args):
         self.args = args
-        self.ds = ds
-        self.mdl = nn.DataParallel(getattr(models, self.args.model)(ds.ne, ds.nr, self.args))
+        self.ds = Dataset(self.args)
+        self.dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=os.cpu_count(),
+                             pin_memory=True, collate_fn=lambda x: [T.cat([_[i] for _ in x]) for i in range(len(x[0]))])
+        self.mdl = nn.DataParallel(getattr(models, self.args.model)(self.ds.ne, self.ds.nr, self.args))
         self.mtrs = ut.Metric()
         self.tb_sw = SummaryWriter()
 
@@ -30,28 +34,24 @@ class Runner(object):
         ls_f = nn.CrossEntropyLoss()
 
         for e in range(1, self.args.ne + 1):
-            self.ds.reset()
             self.mdl.train()
 
-            stp = 0
             tot_ls = 0.0
-            with tqdm(total=int(np.ceil(len(self.ds) / self.args.bs)), desc=f'epoch {e}/{self.args.ne}') as pb:
-                while self.ds.loc >= 0:
+            with tqdm(total=len(self.dl), desc=f'epoch {e}/{self.args.ne}') as pb:
+                for i, (s, r, o, y, m, d, s_t, s_e, o_t, o_e) in enumerate(self.dl, 1):
                     opt.zero_grad()
-                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = self.ds.next(self.args.bs, self.args.nneg, self.args.dvc)
                     sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.args.nneg + 1)
                     ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
                     ls.backward()
                     opt.step()
                     tot_ls += ls.item()
 
-                    stp += 1
-                    self.tb_sw.add_scalar(f'train/loss/{e}', ls.item(), stp)
-                    pb.set_postfix(loss=f'{tot_ls / stp:.6f}')
+                    self.tb_sw.add_scalar(f'train/loss/{e}', ls.item(), i)
+                    pb.set_postfix(loss=f'{tot_ls / i:.6f}')
                     pb.update()
 
-            self.log_tensorboard('train', {'loss': tot_ls / stp}, e)
-            logging.info(f'epoch {e}/{self.args.ne}: loss={tot_ls / stp:.6f}')
+            self.log_tensorboard('train', {'loss': tot_ls / len(self.dl)}, e)
+            logging.info(f'epoch {e}/{self.args.ne}: loss={tot_ls / len(self.dl):.6f}')
 
             if self.args.vd and (e % self.args.vd_stp == 0 or e == self.args.ne):
                 mtrs = self.test('vd')
@@ -66,10 +66,10 @@ class Runner(object):
     def test(self, chk):
         self.mdl.eval()
         mtrs = ut.Metric()
-        with tqdm(total=len(self.ds._ds[chk]), desc='valid' if chk == 'vd' else 'test') as pb:
-            for x in self.ds._ds[chk]:
+        with tqdm(total=len(self.ds.chk[chk]), desc='valid' if chk == 'vd' else 'test') as pb:
+            for x in self.ds.chk[chk]:
                 for md in ['s', 'o']:
-                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = self.ds.prepare(x, md, self.args.dvc)
+                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = self.ds.prepare(x, md)
                     sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
                     rk = (sc > sc[0]).sum() + 1
                     mtrs.update(rk)

@@ -4,7 +4,6 @@ import os
 import torch as T
 
 from src import utils as ut
-from src.dataset import Dataset
 from src.runner import Runner
 
 
@@ -19,7 +18,7 @@ if __name__ == '__main__':
     for k, v in sorted(vars(args).items()):
         logging.info(f'{k} = {v}')
 
-    r = Runner(Dataset(args.dataset), args)
+    r = Runner(args)
 
     if args.tr:
         r.train()

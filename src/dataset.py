@@ -6,11 +6,10 @@ from datetime import datetime
 import numpy as np
 import torch as T
 from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import Dataset as tDataset
 
-from src import utils as ut
 
-
-class Dataset(object):
+class Dataset(tDataset):
     @staticmethod
     def _id(x2id, x):
         x2id[x] = x2id.get(x, len(x2id))
@@ -22,16 +21,19 @@ class Dataset(object):
             for line in f.readlines():
                 s, r, o, t = line.strip().split('\t')
                 t = list(map(float, t.split('-')))
-                tups.append([self._id(self._e2id, s), self._id(self._r2id, r), self._id(self._e2id, o), *t])
+                tups.append([self._id(self.e2id, s), self._id(self.r2id, r), self._id(self.e2id, o), *t])
         return np.array(tups)
 
     def _ix(self):
-        ix = defaultdict(lambda: defaultdict(list))
-        for s, r, o, y, m, d in self._ds['tr'].astype(np.int):
+        ix, s_ix = {}, {}
+        for i in range(self.ne):
+            ix[i], s_ix[i] = {}, {}
+            for j in range(self.nr):
+                ix[i][j], s_ix[i][j] = [], {'t': [], 'e': []}
+        for s, r, o, y, m, d in self.chk['tr'].astype(np.int):
             t = datetime(year=y, month=m, day=d, tzinfo=pytz.utc).toordinal()
             ix[s][r].append((t, o))
             ix[o][r].append((t, s))  # NOTE: Could have a different list here (-o - 1)
-        s_ix = defaultdict(lambda: defaultdict(lambda: {'t': [], 'e': []}))
         for k in ix:
             for r in ix[k]:
                 s_r = sorted(set(ix[k][r]))
@@ -39,32 +41,21 @@ class Dataset(object):
                 s_ix[k][r]['e'] = list(map(lambda x: x[1], s_r))
         return s_ix
 
-    def __init__(self, ds):
-        self.loc = 0
-        self._e2id = {}
-        self._r2id = {}
-        self._ds = {'tr': self._read(f'data/{ds}/train.txt'),
-                    'vd': self._read(f'data/{ds}/valid.txt'),
-                    'ts':  self._read(f'data/{ds}/test.txt')}
+    def __init__(self, args):
+        self.nneg = args.nneg
+        self.e2id = {}
+        self.r2id = {}
+        self.chk = {'tr': self._read(f'data/{args.dataset}/train.txt'),
+                    'vd': self._read(f'data/{args.dataset}/valid.txt'),
+                    'ts':  self._read(f'data/{args.dataset}/test.txt')}
+        self.ne = len(self.e2id)
+        self.nr = len(self.r2id)
         self.ix = self._ix()
-        self.ne = len(self._e2id)
-        self.nr = len(self._r2id)
-        self.al = set(map(tuple, np.concatenate(list(self._ds.values())).tolist()))
+        self.al = set(map(tuple, np.concatenate(list(self.chk.values())).tolist()))
+        self.dvc = args.dvc
 
     def __len__(self):
-        return len(self._ds['tr'])
-
-    def reset(self):
-        self.loc = 0
-
-    def _pos(self, bs):
-        if self.loc + bs <= len(self._ds['tr']):
-            pos = self._ds['tr'][self.loc:self.loc + bs]
-            self.loc += bs
-        else:
-            pos = self._ds['tr'][self.loc:]
-            self.loc = -1
-        return pos
+        return len(self.chk['tr'])
 
     def _neg(self, pos, nneg):
         s_neg = np.repeat(pos, nneg + 1, axis=0)
@@ -78,7 +69,7 @@ class Dataset(object):
         o_neg[:, 2] = (o_neg[:, 2] + o_rnd) % self.ne
         return np.concatenate((s_neg, o_neg), axis=0)
 
-    def _rel(self, neg, dvc):
+    def _rel(self, neg):
         r_s, r_o = [], []
         for s, _, o, y, m, d in neg:
             r_s.append([])
@@ -91,18 +82,32 @@ class Dataset(object):
                 r_o[-1].append((self.ix[o][r]['t'][o_ix], self.ix[o][r]['e'][o_ix]) if o_ix != -1 else (-1, -1))
         return np.array(r_s), np.array(r_o)
 
-    def next(self, bs, nneg, dvc):
-        p = self._pos(bs)
-        pn = self._neg(p, nneg)
-        r_s, r_o = self._rel(pn, dvc)
-        return ut.shred(pn, dvc) + ut.shred_rel(r_s, dvc) + ut.shred_rel(r_o, dvc)
+    def _shred(self, tup):
+        s = T.tensor(tup[:, 0]).long().to(self.dvc)
+        r = T.tensor(tup[:, 1]).long().to(self.dvc)
+        o = T.tensor(tup[:, 2]).long().to(self.dvc)
+        y = T.tensor(tup[:, 3]).float().to(self.dvc)
+        m = T.tensor(tup[:, 4]).float().to(self.dvc)
+        d = T.tensor(tup[:, 5]).float().to(self.dvc)
+        return s, r, o, y, m, d
 
-    def prepare(self, x, md, dvc):
+    def _shred_rel(self, tup):
+        t = T.tensor(tup[:, :, 0]).float().to(self.dvc)
+        e = T.tensor(tup[:, :, 1]).long().to(self.dvc)
+        return t, e
+
+    def __getitem__(self, i):
+        p = self.chk['tr'][i].reshape(1, -1)
+        pn = self._neg(p, self.nneg)
+        r_s, r_o = self._rel(pn)
+        return self._shred(pn) + self._shred_rel(r_s) + self._shred_rel(r_o)
+
+    def prepare(self, x, md):
         s, r, o, y, m, d = x
         if md == 's':
             x_ts = [(i, r, o, y, m, d) for i in range(self.ne)]
         if md == 'o':
             x_ts = [(s, r, i, y, m, d) for i in range(self.ne)]
         x_ts = np.array([tuple(x)] + list(set(x_ts) - self.al))
-        r_s, r_o = self._rel(x_ts, dvc)
-        return ut.shred(x_ts, dvc) + ut.shred_rel(r_s, dvc) + ut.shred_rel(r_o, dvc)
+        r_s, r_o = self._rel(x_ts)
+        return self._shred(x_ts) + self._shred_rel(r_s) + self._shred_rel(r_o)
