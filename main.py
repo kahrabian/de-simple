@@ -27,6 +27,6 @@ if __name__ == '__main__':
     if args.ts:
         with T.no_grad():
             r.load()
-            mtrs = r.test('ts')
-            r.log_tensorboard('valid', mtrs, 0)
+            mtrs = r.test()
+            r.log_tensorboard('test', mtrs, 0)
             logging.info(f'Test: {mtrs}')

@@ -23,8 +23,6 @@ class Runner(object):
         self.args = args
         self.mem = self.load_mem()
         self.ds = Dataset(self.mem, self.args)
-        self.dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=os.cpu_count(),
-                             pin_memory=True, collate_fn=Dataset.collate_fn)
         self.mdl = nn.DataParallel(getattr(models, self.args.model)(self.ds.ne, self.ds.nr, self.args))
         self.mtrs = ut.Metric()
         self.tb_sw = SummaryWriter()
@@ -39,10 +37,13 @@ class Runner(object):
 
         for e in range(1, self.args.ne + 1):
             self.mdl.train()
+            self.ds.train()
 
             tot_ls = 0.0
-            with tqdm(total=len(self.dl), desc=f'epoch {e}/{self.args.ne}') as pb:
-                for i, x in enumerate(self.dl, 1):
+            dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=os.cpu_count(), pin_memory=True,
+                            collate_fn=Dataset.collate_fn)
+            with tqdm(total=len(dl), desc=f'epoch {e}/{self.args.ne}') as pb:
+                for i, x in enumerate(dl, 1):
                     opt.zero_grad()
                     s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
                     sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.args.nneg + 1)
@@ -56,11 +57,11 @@ class Runner(object):
                     pb.update()
 
             self.save_mem()
-            self.log_tensorboard('train', {'loss': tot_ls / len(self.dl)}, e)
-            logging.info(f'epoch {e}/{self.args.ne}: loss={tot_ls / len(self.dl):.6f}')
+            self.log_tensorboard('train', {'loss': tot_ls / len(dl)}, e)
+            logging.info(f'epoch {e}/{self.args.ne}: loss={tot_ls / len(dl):.6f}')
 
             if self.args.vd and (e % self.args.vd_stp == 0 or e == self.args.ne):
-                mtrs = self.test('vd')
+                mtrs = self.valid()
                 self.save_mem()
                 self.log_tensorboard('valid', mtrs, e)
                 logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
@@ -70,17 +71,13 @@ class Runner(object):
 
         self.tb_sw.add_hparams(vars(self.args), dict(self.mtrs))
 
-    def test(self, chk):
-        logging.info(f'started loading {chk} chunk')
-        with mp.Pool(os.cpu_count()) as p:
-            x_ts = p.map(self.ds.prepare, self.ds.chk[chk][:3])
-        self.save_mem()
-        logging.info(f'finished loading {chk} chunk')
-
+    def eval(self, desc):
         self.mdl.eval()
         mtrs = ut.Metric()
-        with tqdm(total=len(self.ds.chk[chk]), desc='valid' if chk == 'vd' else 'test') as pb:
-            for x in x_ts:
+        dl = DataLoader(self.ds, batch_size=1, shuffle=False, num_workers=os.cpu_count(), pin_memory=True,
+                        collate_fn=Dataset.collate_fn)
+        with tqdm(total=len(dl), desc=desc) as pb:
+            for i, x in enumerate(dl, 1):
                 s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
                 sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
                 rk = (sc > sc[0]).sum() + 1
@@ -88,6 +85,14 @@ class Runner(object):
             pb.set_postfix(**dict(mtrs))
             pb.update()
         return mtrs
+
+    def test(self):
+        self.ds.test()
+        return self.eval('test')
+
+    def valid(self):
+        self.ds.valid()
+        return self.eval('valid')
 
     def load(self, opt=None):
         chk = T.load(os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))

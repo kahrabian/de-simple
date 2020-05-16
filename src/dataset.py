@@ -42,7 +42,7 @@ class Dataset(tDataset):
             ix[i], s_ix[i] = {}, {}
             for j in range(self.nr):
                 ix[i][j], s_ix[i][j] = [], {'t': [], 'e': []}
-        for s, r, o, y, m, d in self.chk['tr'].astype(np.int):
+        for s, r, o, y, m, d in self.tr.astype(np.int):
             t = datetime(year=y, month=m, day=d, tzinfo=pytz.utc).toordinal()
             ix[s][r].append((t, o))
             ix[o][r].append((t, s))  # NOTE: Could have a different list here (-o - 1)
@@ -54,20 +54,30 @@ class Dataset(tDataset):
         return s_ix
 
     def __init__(self, mem, args):
+        self.md = 'tr'
         self.mem = mem
         self.nneg = args.nneg
         self.e2id = {}
         self.r2id = {}
-        self.chk = {'tr': self._read(f'data/{args.dataset}/train.txt'),
-                    'vd': self._read(f'data/{args.dataset}/valid.txt'),
-                    'ts':  self._read(f'data/{args.dataset}/test.txt')}
+        self.tr = self._read(f'data/{args.dataset}/train.txt')
+        self.vd = self._read(f'data/{args.dataset}/valid.txt')
+        self.ts = self._read(f'data/{args.dataset}/test.txt')
+        self.al = set(map(tuple, np.concatenate([self.tr, self.vd, self.ts]).tolist()))
         self.ne = len(self.e2id)
         self.nr = len(self.r2id)
         self.ix = self._ix()
-        self.al = set(map(tuple, np.concatenate(list(self.chk.values())).tolist()))
+
+    def train(self):
+        self.md = 'tr'
+
+    def valid(self):
+        self.md = 'vd'
+
+    def test(self):
+        self.md = 'ts'
 
     def __len__(self):
-        return len(self.chk['tr'])
+        return len(getattr(self, self.md))
 
     def _neg(self, pos, nneg):
         s_neg = np.repeat(pos, nneg + 1, axis=0)
@@ -116,19 +126,21 @@ class Dataset(tDataset):
         return t, e
 
     def __getitem__(self, i):
-        p = self.chk['tr'][i].reshape(1, -1)
-        pn = self._neg(p, self.nneg)
-        r_s, r_o = self._rel(pn)
-        return self._shred(pn) + self._shred_rel(r_s) + self._shred_rel(r_o)
-
-    def prepare(self, x):
-        x = tuple(x)
-        if x in self.mem:
-            x_ts = self.mem[x]
+        if self.md == 'tr':
+            p = self.tr[i].reshape(1, -1)
+            pn = self._neg(p, self.nneg)
+            r_s, r_o = self._rel(pn)
+            return self._shred(pn) + self._shred_rel(r_s) + self._shred_rel(r_o)
+        elif self.md in ['vd', 'ts']:
+            x = getattr(self, self.md)[i]
+            if x in self.mem:
+                x_ts = self.mem[x]
+            else:
+                s, r, o, y, m, d = x
+                x_ts = [(i, r, o, y, m, d) for i in range(self.ne)] + [(s, r, i, y, m, d) for i in range(self.ne)]
+                x_ts = np.array([x, ] + list(set(x_ts) - self.al))
+                self.mem[x] = x_ts
+            r_s, r_o = self._rel(x_ts)
+            return self._shred(x_ts) + self._shred_rel(r_s) + self._shred_rel(r_o)
         else:
-            s, r, o, y, m, d = x
-            x_ts = [(i, r, o, y, m, d) for i in range(self.ne)] + [(s, r, i, y, m, d) for i in range(self.ne)]
-            x_ts = np.array([x, ] + list(set(x_ts) - self.al))
-            self.mem[x] = x_ts
-        r_s, r_o = self._rel(x_ts)
-        return self._shred(x_ts) + self._shred_rel(r_s) + self._shred_rel(r_o)
+            raise ValueError('dataset mode is invalid!')
