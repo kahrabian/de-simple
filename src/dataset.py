@@ -133,13 +133,9 @@ class Dataset(tDataset):
             return self._shred(pn) + self._shred_rel(r_s) + self._shred_rel(r_o)
         elif self.md in ['vd', 'ts']:
             x = getattr(self, self.md)[i]
-            if x in self.mem:
-                x_ts = self.mem[x]
-            else:
-                s, r, o, y, m, d = x
-                x_ts = [(i, r, o, y, m, d) for i in range(self.ne)] + [(s, r, i, y, m, d) for i in range(self.ne)]
-                x_ts = np.array([x, ] + list(set(x_ts) - self.al))
-                self.mem[x] = x_ts
+            s, r, o, y, m, d = x
+            x_ts = [(i, r, o, y, m, d) for i in range(self.ne)] + [(s, r, i, y, m, d) for i in range(self.ne)]
+            x_ts = np.array([x, ] + list(set(x_ts) - self.al))
             r_s, r_o = self._rel(x_ts)
             return self._shred(x_ts) + self._shred_rel(r_s) + self._shred_rel(r_o)
         else:

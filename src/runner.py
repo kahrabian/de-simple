@@ -35,25 +35,25 @@ class Runner(object):
         opt = T.optim.Adam(self.mdl.parameters(), lr=self.args.lr)
         ls_f = nn.CrossEntropyLoss()
 
+        dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=self.args.w, pin_memory=True,
+                        collate_fn=Dataset.collate_fn)
         for e in range(1, self.args.ne + 1):
             self.mdl.train()
             self.ds.train()
 
             tot_ls = 0.0
-            dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=os.cpu_count(), pin_memory=True,
-                            collate_fn=Dataset.collate_fn)
             with tqdm(total=len(dl), desc=f'epoch {e}/{self.args.ne}') as pb:
                 for i, x in enumerate(dl, 1):
-                    opt.zero_grad()
-                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
-                    sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.args.nneg + 1)
-                    ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
-                    ls.backward()
-                    opt.step()
-                    tot_ls += ls.item()
-
-                    self.tb_sw.add_scalar(f'train/loss/{e}', ls.item(), i)
-                    pb.set_postfix(loss=f'{tot_ls / i:.6f}')
+                    if self.args.ch:
+                        opt.zero_grad()
+                        s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
+                        sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.args.nneg + 1)
+                        ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
+                        ls.backward()
+                        opt.step()
+                        tot_ls += ls.item()
+                        self.tb_sw.add_scalar(f'train/loss/{e}', ls.item(), i)
+                        pb.set_postfix(loss=f'{tot_ls / i:.6f}')
                     pb.update()
 
             self.save_mem()
@@ -68,15 +68,16 @@ class Runner(object):
     def eval(self, desc):
         self.mdl.eval()
         mtrs = ut.Metric()
-        dl = DataLoader(self.ds, batch_size=1, shuffle=False, num_workers=os.cpu_count(), pin_memory=True,
+        dl = DataLoader(self.ds, batch_size=1, shuffle=False, num_workers=self.args.w, pin_memory=True,
                         collate_fn=Dataset.collate_fn)
         with tqdm(total=len(dl), desc=desc) as pb:
             for i, x in enumerate(dl, 1):
-                s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
-                sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
-                rk = (sc > sc[0]).sum() + 1
-                mtrs.update(rk)
-                pb.set_postfix(**dict(mtrs))
+                if self.args.ch:
+                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
+                    sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
+                    rk = (sc > sc[0]).sum() + 1
+                    mtrs.update(rk)
+                    pb.set_postfix(**dict(mtrs))
                 pb.update()
         return mtrs
 
