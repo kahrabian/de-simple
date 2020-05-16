@@ -44,7 +44,7 @@ class Runner(object):
             tot_ls = 0.0
             with tqdm(total=len(dl), desc=f'epoch {e}/{self.args.ne}') as pb:
                 for i, x in enumerate(dl, 1):
-                    if self.args.ch:
+                    if not self.args.ch:
                         opt.zero_grad()
                         s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
                         sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.args.nneg + 1)
@@ -72,7 +72,7 @@ class Runner(object):
                         collate_fn=Dataset.collate_fn)
         with tqdm(total=len(dl), desc=desc) as pb:
             for i, x in enumerate(dl, 1):
-                if self.args.ch:
+                if not self.args.ch:
                     s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
                     sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
                     rk = (sc > sc[0]).sum() + 1
