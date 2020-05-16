@@ -83,23 +83,26 @@ class Runner(object):
 
     def test(self):
         with T.no_grad():
-            self.load()
+            if not self.args.ch:
+                self.load()
             self.ds.test()
             mtrs = self.eval('test')
             self.save_mem()
-            self.log_tensorboard('test', mtrs, 0)
-            logging.info(f'Test: {mtrs}')
+            if not self.args.ch:
+                self.log_tensorboard('test', mtrs, 0)
+                logging.info(f'Test: {mtrs}')
 
     def valid(self, e, opt):
         with T.no_grad():
             self.ds.valid()
             mtrs = self.eval('valid')
             self.save_mem()
-            self.log_tensorboard('valid', mtrs, e)
-            logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
-            if self.mtrs.cnt == 0 or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
-                self.mtrs = mtrs
-                self.save(opt)
+            if not self.args.ch:
+                self.log_tensorboard('valid', mtrs, e)
+                logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
+                if self.mtrs.cnt == 0 or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
+                    self.mtrs = mtrs
+                    self.save(opt)
 
     def load(self, opt=None):
         chk = T.load(os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))
