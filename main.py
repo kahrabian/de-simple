@@ -25,8 +25,4 @@ if __name__ == '__main__':
         r.train()
 
     if args.ts:
-        with T.no_grad():
-            r.load()
-            mtrs = r.test()
-            r.log_tensorboard('test', mtrs, 0)
-            logging.info(f'Test: {mtrs}')
+        r.test()

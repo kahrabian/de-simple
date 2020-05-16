@@ -61,13 +61,7 @@ class Runner(object):
             logging.info(f'epoch {e}/{self.args.ne}: loss={tot_ls / len(dl):.6f}')
 
             if self.args.vd and (e % self.args.vd_stp == 0 or e == self.args.ne):
-                mtrs = self.valid()
-                self.save_mem()
-                self.log_tensorboard('valid', mtrs, e)
-                logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
-                if self.mtrs.cnt == 0 or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
-                    self.mtrs = mtrs
-                    self.save(opt)
+                self.valid(e, opt)
 
         self.tb_sw.add_hparams(vars(self.args), dict(self.mtrs))
 
@@ -82,17 +76,29 @@ class Runner(object):
                 sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
                 rk = (sc > sc[0]).sum() + 1
                 mtrs.update(rk)
-            pb.set_postfix(**dict(mtrs))
-            pb.update()
+                pb.set_postfix(**dict(mtrs))
+                pb.update()
         return mtrs
 
     def test(self):
-        self.ds.test()
-        return self.eval('test')
+        with T.no_grad():
+            self.load()
+            self.ds.test()
+            mtrs = self.eval('test')
+            self.save_mem()
+            self.log_tensorboard('test', mtrs, 0)
+            logging.info(f'Test: {mtrs}')
 
-    def valid(self):
-        self.ds.valid()
-        return self.eval('valid')
+    def valid(self, e, opt):
+        with T.no_grad():
+            self.ds.valid()
+            mtrs = self.eval('valid')
+            self.save_mem()
+            self.log_tensorboard('valid', mtrs, e)
+            logging.info(f'epoch {e}/{self.args.ne} Validation: {mtrs}')
+            if self.mtrs.cnt == 0 or getattr(mtrs, self.args.mtr) > getattr(self.mtrs, self.args.mtr):
+                self.mtrs = mtrs
+                self.save(opt)
 
     def load(self, opt=None):
         chk = T.load(os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))
