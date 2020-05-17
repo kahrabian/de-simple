@@ -40,11 +40,8 @@ class DEDistMult(nn.Module):
         self.p_proj = nn.Linear(nr, 1, bias=False)
         nn.init.xavier_uniform_(self.p_proj.weight)
 
-        self.r_proj = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim + args.t_dim + args.s_dim * 2))
+        self.r_proj = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim + args.s_dim))
         nn.init.xavier_uniform_(self.r_proj)
-
-        self.pr_emb = nn.Embedding(nr, args.r_dim + args.t_dim + args.s_dim * 2).to(args.dvc)
-        nn.init.xavier_uniform_(self.r_emb.weight)
 
         self.t_nl = T.sin
 
@@ -53,9 +50,8 @@ class DEDistMult(nn.Module):
         msk.requires_grad = False
 
         t_emb = self.p_emb(t.view(-1) + msk.view(-1).long()).view(t.size(0), -1, t.size(1))
-        r_emb = self.r_emb.weight.permute(1, 0).repeat(t.size(0), 1, 1)
         e_emb = self.e_emb(e.view(-1) + msk.view(-1).long()).view(e.size(0), -1, e.size(1))
-        emb = T.cat([t_emb, r_emb, e_emb], dim=1)
+        emb = T.cat([t_emb, e_emb], dim=1)
         emb[msk.unsqueeze(1).repeat(1, emb.size(1), 1)] = 0
 
         return emb
@@ -89,7 +85,7 @@ class DEDistMult(nn.Module):
         sc = T.cat([(s_emb * r_emb) * o_emb,
                     T.einsum('be,bpe->bp', (p_emb_s, w_r)) * o_emb,
                     s_emb * T.einsum('be,bpe->bp', (p_emb_o, w_r)),
-                    (p_emb_s * self.pr_emb(r)) * p_emb_o], dim=1)
+                    p_emb_s * p_emb_o], dim=1)
         sc = F.dropout(sc, p=self.drp, training=self.training)
         sc = T.sum(sc, dim=1)
 
