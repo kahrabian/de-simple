@@ -74,10 +74,11 @@ class Runner(object):
         with tqdm(total=len(dl), desc=desc) as pb:
             for i, x in enumerate(dl, 1):
                 if not self.args.ch:
-                    s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
-                    sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).detach().cpu().numpy()
-                    rk = (sc > sc[0]).sum() + 1
-                    mtrs.update(rk)
+                    s, r, o, y, m, d, s_t, s_e, o_t, o_e, f = ut.to(self.args.dvc, x)
+                    sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.ds.ne + 1)
+                    rks = T.sum((sc > sc[0]) & f.view(-1, self.ds.ne + 1).detach().cpu().numpy(), dim=1) + 1
+                    for rk in rks.detach().cpu().numpy():
+                        mtrs.update(rk)
                     pb.set_postfix(**dict(mtrs))
                 pb.update()
         return mtrs
