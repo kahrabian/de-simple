@@ -41,7 +41,7 @@ class Runner(object):
             self.mdl.train()
             self.ds.train()
 
-            tot_ls = 0.0
+            avg_ls = 0.0
             with tqdm(total=len(dl), desc=f'epoch {e}/{self.args.ne}') as pb:
                 for i, x in enumerate(dl, 1):
                     if not self.args.ch:
@@ -51,14 +51,15 @@ class Runner(object):
                         ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
                         ls.backward()
                         opt.step()
-                        tot_ls += ls.item()
-                        self.tb_sw.add_scalar(f'train/loss/{e}', ls.item(), i)
-                        pb.set_postfix(loss=f'{tot_ls / i:.6f}')
+                        avg_ls += ls.item()
+                        self.tb_sw.add_scalar(f'epoch/loss/{e}', ls.item(), i)
+                        self.tb_sw.add_scalar('train/loss', ls.item(), (e - 1) * len(dl) + i)
+                        pb.set_postfix(loss=f'{avg_ls / i:.6f}')
                     pb.update()
 
             self.save_mem()
-            self.log_tensorboard('train', {'loss': tot_ls / len(dl)}, e)
-            logging.info(f'epoch {e}/{self.args.ne}: loss={tot_ls / len(dl):.6f}')
+            self.log_tensorboard('train', {'loss': avg_ls / len(dl)}, e)
+            logging.info(f'epoch {e}/{self.args.ne}: loss={avg_ls / len(dl):.6f}')
 
             if self.args.vd and (e % self.args.vd_stp == 0 or e == self.args.ne):
                 self.valid(e, opt)
