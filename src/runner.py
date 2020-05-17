@@ -69,7 +69,7 @@ class Runner(object):
     def eval(self, desc):
         self.mdl.eval()
         mtrs = ut.Metric()
-        dl = DataLoader(self.ds, batch_size=1, shuffle=False, num_workers=self.args.w, pin_memory=True,
+        dl = DataLoader(self.ds, batch_size=self.args.tbs, shuffle=False, num_workers=self.args.w, pin_memory=True,
                         collate_fn=Dataset.collate_fn)
         with tqdm(total=len(dl), desc=desc) as pb:
             for i, x in enumerate(dl, 1):

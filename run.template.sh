@@ -19,6 +19,7 @@ python main.py -id ${SLURM_JOB_ID} \
     -r_dim 16 \
     -ne 500 \
     -bs 512 \
+    -tbs 1 \
     -lr 0.001 \
     -nneg 500 \
     -drp 0.4 \
