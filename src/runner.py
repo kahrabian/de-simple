@@ -35,7 +35,7 @@ class Runner(object):
         opt = T.optim.Adam(self.mdl.parameters(), lr=self.args.lr)
         ls_f = nn.CrossEntropyLoss()
 
-        dl = DataLoader(self.ds, batch_size=self.args.bs, shuffle=True, num_workers=self.args.w, pin_memory=True,
+        dl = DataLoader(self.ds, batch_size=self.args.bs, num_workers=self.args.w, pin_memory=True,
                         collate_fn=Dataset.collate_fn)
         for e in range(1, self.args.ne + 1):
             self.mdl.train()
@@ -69,7 +69,7 @@ class Runner(object):
     def eval(self, desc):
         self.mdl.eval()
         mtrs = ut.Metric()
-        dl = DataLoader(self.ds, batch_size=self.args.tbs, shuffle=False, num_workers=self.args.w, pin_memory=True,
+        dl = DataLoader(self.ds, batch_size=self.args.tbs, num_workers=self.args.w, pin_memory=True,
                         collate_fn=Dataset.collate_fn)
         with tqdm(total=len(dl), desc=desc) as pb:
             for i, x in enumerate(dl, 1):
