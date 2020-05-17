@@ -87,8 +87,8 @@ class DEDistMult(nn.Module):
         w_r = T.index_select(self.r_proj, dim=0, index=r)
 
         sc = T.cat([(s_emb * r_emb) * o_emb,
-                    T.einsum('be,bpe->bp', (p_emb_s, w_r)),
-                    T.einsum('be,bpe->bp', (p_emb_o, w_r)),
+                    T.einsum('be,bpe->bp', (p_emb_s, w_r)) * o_emb,
+                    s_emb * T.einsum('be,bpe->bp', (p_emb_o, w_r)),
                     (p_emb_s * self.pr_emb(r)) * p_emb_o], dim=1)
         sc = F.dropout(sc, p=self.drp, training=self.training)
         sc = T.sum(sc, dim=1)
