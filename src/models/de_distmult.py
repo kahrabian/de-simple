@@ -40,21 +40,10 @@ class DEDistMult(nn.Module):
         self.p_proj = nn.Linear(nr, 1, bias=False)
         nn.init.xavier_uniform_(self.p_proj.weight)
 
-        self.r_proj = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim + args.s_dim))
+        self.r_proj = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim))
         nn.init.xavier_uniform_(self.r_proj)
 
         self.t_nl = T.sin
-
-    def _p_emb(self, t, e):
-        msk = ((t == -1) & (e == -1))  # NOTE: Unavailable relations
-        msk.requires_grad = False
-
-        t_emb = self.p_emb(t.view(-1) + msk.view(-1).long()).view(t.size(0), -1, t.size(1))
-        e_emb = self.e_emb(e.view(-1) + msk.view(-1).long()).view(e.size(0), -1, e.size(1))
-        emb = T.cat([t_emb, e_emb], dim=1)
-        emb[msk.unsqueeze(1).repeat(1, emb.size(1), 1)] = 0
-
-        return emb
 
     def t_emb(self, e, y, m, d):
         y_emb = self.y_amp(e) * self.t_nl(self.y_frq(e) * y + self.y_phi(e))
@@ -75,7 +64,8 @@ class DEDistMult(nn.Module):
     def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb, r_emb, o_emb = self.emb(s, r, o, y, m, d)
 
-        s_p_emb, o_p_emb = self._p_emb(s_t, s_e), self._p_emb(o_t, o_e)
+        s_p_emb = self.p_emb(s_t.view(-1)).view(s_t.size(0), -1, s_t.size(1))
+        o_p_emb = self.p_emb(o_t.view(-1)).view(o_t.size(0), -1, o_t.size(1))
 
         p_emb_s = self.p_proj(s_p_emb).squeeze()
         p_emb_o = self.p_proj(o_p_emb).squeeze()

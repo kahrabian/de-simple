@@ -43,7 +43,7 @@ class Dataset(tDataset):
             for j in range(self.nr):
                 ix[i][j], s_ix[i][j] = [], {'t': [], 'e': []}
         for s, r, o, y, m, d in self.tr.astype(np.int):
-            t = datetime(year=y, month=m, day=d, tzinfo=pytz.utc).toordinal()
+            t = self._rel_t_map((y, m, d))
             ix[s][r].append((t, o))
             ix[o][r].append((t, s))  # NOTE: Could have a different list here (-o - 1)
         for k in ix:
@@ -66,6 +66,7 @@ class Dataset(tDataset):
         self.ne = len(self.e2id)
         self.nr = len(self.r2id)
         self.ix = self._ix()
+        self.min_t = min(map(lambda x: self._rel_t_map(x[-3:]), self.tr))
 
     def train(self):
         self.md = 'tr'
@@ -101,7 +102,7 @@ class Dataset(tDataset):
         r_e = []
         for r in range(self.nr):
             e_ix = bisect.bisect_left(self.ix[x[0]][r]['t'], x[1]) - 1
-            r_e.append((self.ix[x[0]][r]['t'][e_ix], self.ix[x[0]][r]['e'][e_ix]) if e_ix != -1 else (-1, -1))
+            r_e.append((x[1] - self.ix[x[0]][r]['t'][e_ix], self.ix[x[0]][r]['e'][e_ix]) if e_ix != -1 else (x[1] - self.min_t, -1))
         self.mem[mem_k] = r_e
         return r_e
 
