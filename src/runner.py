@@ -128,6 +128,6 @@ class Runner(object):
             return pickle.load(f)
 
     def save_mem(self):
-        with open(self.args.mem_pth + '_tmp', 'wb') as f:
+        with open(self.args.mem_pth + f'_{self.args.id}_tmp', 'wb') as f:
             pickle.dump(self.mem, f, protocol=pickle.HIGHEST_PROTOCOL)
-        shutil.copy(self.args.mem_pth + '_tmp', self.args.mem_pth)
+        shutil.copy(self.args.mem_pth + f'_{self.args.id}_tmp', self.args.mem_pth)
