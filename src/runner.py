@@ -75,10 +75,9 @@ class Runner(object):
             for i, x in enumerate(dl, 1):
                 if not self.args.ch:
                     s, r, o, y, m, d, s_t, s_e, o_t, o_e, f = ut.to(self.args.dvc, x)
-                    sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.ds.ne + 1)
-                    rks = T.sum((sc > sc[0]) & f.view(-1, self.ds.ne + 1), dim=1) + 1
-                    for rk in rks.detach().cpu().numpy():
-                        mtrs.update(rk)
+                    sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.ds.ne + 1).detach().cpu().numpy()
+                    for sc_i, f_i in zip(sc, f.view(-1, self.ds.ne + 1).detach().cpu().numpy()):
+                        mtrs.update((sc_i[f_i] > sc_i[0]).sum() + 1)
                     pb.set_postfix(**dict(mtrs))
                 pb.update()
         return mtrs
@@ -107,7 +106,10 @@ class Runner(object):
                     self.save(opt)
 
     def load(self, opt=None):
-        chk = T.load(os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat'))
+        p = os.path.join(self.args.pth, f'chk_{self.args.mtr}.dat')
+        if not os.path.exists(p):
+            return
+        chk = T.load(p)
         self.mdl.load_state_dict(chk['mdl'])
         if opt is not None:
             opt.load_state_dict(chk['opt'])
