@@ -37,11 +37,14 @@ class DEDistMult(nn.Module):
         nn.init.xavier_uniform_(self.y_amp.weight)
 
         self.p_emb = PositionalEmbedding(args.r_dim)
-        self.p_proj = nn.Linear(nr, 1, bias=False)
-        nn.init.xavier_uniform_(self.p_proj.weight)
+        self.w_p = nn.Linear(nr, 1, bias=False)
+        nn.init.xavier_uniform_(self.w_p.weight)
 
-        self.r_proj = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim))
-        nn.init.xavier_uniform_(self.r_proj)
+        self.w_r = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim))
+        nn.init.xavier_uniform_(self.w_r)
+
+        self.pr_emb = nn.Embedding(nr, args.r_dim).to(args.dvc)
+        nn.init.xavier_uniform_(self.pr_emb.weight)
 
         self.t_nl = T.sin
 
@@ -67,15 +70,15 @@ class DEDistMult(nn.Module):
         s_p_emb = self.p_emb(s_t.view(-1)).view(s_t.size(0), -1, s_t.size(1))
         o_p_emb = self.p_emb(o_t.view(-1)).view(o_t.size(0), -1, o_t.size(1))
 
-        p_emb_s = self.p_proj(s_p_emb).squeeze()
-        p_emb_o = self.p_proj(o_p_emb).squeeze()
+        p_emb_s = self.w_p(s_p_emb).squeeze()
+        p_emb_o = self.w_p(o_p_emb).squeeze()
 
-        w_r = T.index_select(self.r_proj, dim=0, index=r)
+        w_r = T.index_select(self.w_r, dim=0, index=r)
 
         sc = T.cat([(s_emb * r_emb) * o_emb,
                     T.einsum('be,bpe->bp', (p_emb_s, w_r)) * o_emb,
                     s_emb * T.einsum('be,bpe->bp', (p_emb_o, w_r)),
-                    p_emb_s * p_emb_o], dim=1)
+                    p_emb_s * self.pr_emb(r) * p_emb_o], dim=1)
         sc = F.dropout(sc, p=self.drp, training=self.training)
         sc = T.sum(sc, dim=1)
 

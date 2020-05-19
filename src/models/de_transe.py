@@ -2,8 +2,6 @@ import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.embedding import PositionalEmbedding
-
 
 class DETransE(nn.Module):
     def __init__(self, ne, nr, args):
