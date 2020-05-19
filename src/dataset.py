@@ -146,6 +146,9 @@ class Dataset(tDataset):
         e = T.tensor(tup[:, :, 1]).long()
         return t, e
 
+    def _filter(self, x, e, i):
+        return (x not in self.al) and (not self.te or (i in self.t2id[self.e2t[e]]))
+
     def __getitem__(self, i):
         if self.l_md == 'tr':
             p = self.tr[i].reshape(1, -1)
@@ -157,13 +160,11 @@ class Dataset(tDataset):
             s, r, o, y, m, d = x
             x_ts, f = [], []
             if self.e_md in ['f', 's']:
-                print(self.e_md, 's')
                 x_ts.append(np.array([x, ] + [(i, r, o, y, m, d) for i in range(self.ne)]))
-                f.append(np.array([False, ] + [(i, r, o, y, m, d) not in self.al for i in range(self.ne)]))
+                f.append(np.array([False, ] + [self._filter((i, r, o, y, m, d), s, i) for i in range(self.ne)]))
             if self.e_md in ['f', 'o']:
-                print(self.e_md, 'o')
                 x_ts.append(np.array([x, ] + [(s, r, i, y, m, d) for i in range(self.ne)]))
-                f.append(np.array([False, ] + [(s, r, i, y, m, d) not in self.al for i in range(self.ne)]))
+                f.append(np.array([False, ] + [self._filter((s, r, i, y, m, d), o, i) for i in range(self.ne)]))
             x_ts = np.concatenate(x_ts)
             f = np.concatenate(f)
             r_s, r_o = self._rel(x_ts)
