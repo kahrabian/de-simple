@@ -26,4 +26,6 @@ python main.py -id ${SLURM_JOB_ID} \
     -vd_stp 20 \
     -mtr mrr \
     -w 1 \
-    -tr -vd -ts
+    -tr -vd -ts \
+    -md f \
+    -te -he
