@@ -64,7 +64,8 @@ class Runner(object):
             if self.args.vd and (e % self.args.vd_stp == 0 or e == self.args.ne):
                 self.valid(e, opt)
 
-        self.tb_sw.add_hparams(vars(self.args), dict(self.mtrs))
+        if not self.args.ch:
+            self.tb_sw.add_hparams(vars(self.args), dict(self.mtrs))
 
     def eval(self, desc):
         self.mdl.eval()

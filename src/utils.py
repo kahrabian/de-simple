@@ -45,8 +45,9 @@ def args():
     parser = argparse.ArgumentParser(description='Temporal KG Completion')
 
     parser.add_argument('-id', type=str, required=True)
-    parser.add_argument('-dataset', type=str, default='icews14', choices=['gdelt', 'icews14', 'icews05-15'])
-    parser.add_argument('-model', type=str, default='DEDistMult', choices=['DEDistMult', 'DETransE', 'DESimplE'])
+    parser.add_argument('-dataset', type=str, required=True,
+                        choices=['gdelt', 'icews14', 'icews05-15', 'GitGraph_TE_0.01', 'GitGraph_TI_0.01'])
+    parser.add_argument('-model', type=str, required=True, choices=['DEDistMult', 'DETransE', 'DESimplE'])
     parser.add_argument('-s_dim', type=int, default=20)
     parser.add_argument('-t_dim', type=int, default=64)
     parser.add_argument('-r_dim', type=int, default=16)
@@ -58,6 +59,9 @@ def args():
     parser.add_argument('-drp', type=float, default=0.4)
     parser.add_argument('-vd_stp', type=int, default=20)
     parser.add_argument('-mtr', type=str, default='mrr', choices=['h_1', 'h_3', 'h_10', 'mr', 'mrr'])
+    parser.add_argument('-md', type=str, default='f', choices=['s', 'o', 'f'])
+    parser.add_argument('-te', action='store_true')
+    parser.add_argument('-he', action='store_true')
     parser.add_argument('-tr', action='store_true')
     parser.add_argument('-vd', action='store_true')
     parser.add_argument('-ts', action='store_true')

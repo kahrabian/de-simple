@@ -1,5 +1,6 @@
 import bisect
 import pytz
+import re
 from collections import defaultdict
 from datetime import datetime
 
@@ -10,6 +11,8 @@ from torch.utils.data import Dataset as tDataset
 
 
 class Dataset(tDataset):
+    _t_regx = re.compile(r'^/(\w+)/.*$')
+
     @staticmethod
     def collate_fn(x):
         return [T.cat([_[i] for _ in x]) for i in range(len(x[0]))]
@@ -19,13 +22,24 @@ class Dataset(tDataset):
         x2id[x] = x2id.get(x, len(x2id))
         return x2id[x]
 
+    def _t_id(self, x, x_id):
+        t = re.findall(self._t_regx, x)[0]
+        self.e2t[x_id] = t
+        if t not in self.t2id:
+            self.t2id[t] = set()
+        self.t2id[t].add(x_id)
+
     def _read(self, fn):
         tups = []
         with open(fn, 'r') as f:
             for line in f.readlines():
                 s, r, o, t = line.strip().split('\t')
+                s_id, r_id, o_id = self._id(self.e2id, s), self._id(self.r2id, r), self._id(self.e2id, o)
                 t = list(map(float, t.split('-')))
-                tups.append([self._id(self.e2id, s), self._id(self.r2id, r), self._id(self.e2id, o), *t])
+                tups.append([s_id, r_id, o_id, *t])
+                if self.te:
+                    self._t_id(s, s_id)
+                    self._t_id(o, o_id)
         return np.array(tups)
 
     @staticmethod
@@ -54,11 +68,16 @@ class Dataset(tDataset):
         return s_ix
 
     def __init__(self, mem, args):
-        self.md = 'tr'
+        self.l_md = 'tr'
+        self.e_md = args.md
         self.mem = mem
         self.nneg = args.nneg
         self.e2id = {}
         self.r2id = {}
+        self.te = args.te
+        if self.te:
+            self.e2t = {}
+            self.t2id = {}
         self.tr = self._read(f'data/{args.dataset}/train.txt')
         self.vd = self._read(f'data/{args.dataset}/valid.txt')
         self.ts = self._read(f'data/{args.dataset}/test.txt')
@@ -66,19 +85,20 @@ class Dataset(tDataset):
         self.ne = len(self.e2id)
         self.nr = len(self.r2id)
         self.ix = self._ix()
-        self.min_t = min(map(lambda x: self._rel_t_map(x[-3:]), self.tr))
+        self.t_pr = min(map(lambda x: self._rel_t_map(x[-3:]), self.tr)) - \
+            max(map(lambda x: self._rel_t_map(x[-3:]), self.tr))
 
     def train(self):
-        self.md = 'tr'
+        self.l_md = 'tr'
 
     def valid(self):
-        self.md = 'vd'
+        self.l_md = 'vd'
 
     def test(self):
-        self.md = 'ts'
+        self.l_md = 'ts'
 
     def __len__(self):
-        return len(getattr(self, self.md))
+        return len(getattr(self, self.l_md))
 
     def _neg(self, pos, nneg):
         s_neg = np.repeat(pos, nneg + 1, axis=0)
@@ -101,8 +121,8 @@ class Dataset(tDataset):
             return self.mem[mem_k]
         r_e = []
         for r in range(self.nr):
-            e_ix = bisect.bisect_left(self.ix[x[0]][r]['t'], x[1]) - 1
-            r_e.append((x[1] - self.ix[x[0]][r]['t'][e_ix], self.ix[x[0]][r]['e'][e_ix]) if e_ix != -1 else (x[1] - self.min_t, -1))
+            i = bisect.bisect_left(self.ix[x[0]][r]['t'], x[1]) - 1
+            r_e.append((x[1] - self.ix[x[0]][r]['t'][i], self.ix[x[0]][r]['e'][i]) if i != -1 else (self.t_pr, -1))
         self.mem[mem_k] = r_e
         return r_e
 
@@ -127,20 +147,25 @@ class Dataset(tDataset):
         return t, e
 
     def __getitem__(self, i):
-        if self.md == 'tr':
+        if self.l_md == 'tr':
             p = self.tr[i].reshape(1, -1)
             pn = self._neg(p, self.nneg)
             r_s, r_o = self._rel(pn)
             return self._shred(pn) + self._shred_rel(r_s) + self._shred_rel(r_o)
-        elif self.md in ['vd', 'ts']:
-            x = getattr(self, self.md)[i]
+        elif self.l_md in ['vd', 'ts']:
+            x = getattr(self, self.l_md)[i]
             s, r, o, y, m, d = x
-            x_ts_s = np.array([x, ] + [(i, r, o, y, m, d) for i in range(self.ne)])
-            x_ts_o = np.array([x, ] + [(s, r, i, y, m, d) for i in range(self.ne)])
-            x_ts = np.concatenate([x_ts_s, x_ts_o])
-            f_s = np.array([False, ] + [(i, r, o, y, m, d) not in self.al for i in range(self.ne)])
-            f_o = np.array([False, ] + [(s, r, i, y, m, d) not in self.al for i in range(self.ne)])
-            f = np.concatenate([f_s, f_o])
+            x_ts, f = [], []
+            if self.e_md in ['f', 's']:
+                print(self.e_md, 's')
+                x_ts.append(np.array([x, ] + [(i, r, o, y, m, d) for i in range(self.ne)]))
+                f.append(np.array([False, ] + [(i, r, o, y, m, d) not in self.al for i in range(self.ne)]))
+            if self.e_md in ['f', 'o']:
+                print(self.e_md, 'o')
+                x_ts.append(np.array([x, ] + [(s, r, i, y, m, d) for i in range(self.ne)]))
+                f.append(np.array([False, ] + [(s, r, i, y, m, d) not in self.al for i in range(self.ne)]))
+            x_ts = np.concatenate(x_ts)
+            f = np.concatenate(f)
             r_s, r_o = self._rel(x_ts)
             return self._shred(x_ts) + self._shred_rel(r_s) + self._shred_rel(r_o) + (T.from_numpy(f),)
         else:
