@@ -1,6 +1,7 @@
 autopep8
 ipython
 numpy
+pandas
 pytz
 tensorflow
 tensorboard

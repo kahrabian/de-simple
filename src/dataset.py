@@ -1,10 +1,12 @@
 import bisect
+import itertools
 import pytz
 import re
 from collections import defaultdict
 from datetime import datetime
 
 import numpy as np
+import pandas as pd
 import torch as T
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset as tDataset
@@ -40,7 +42,7 @@ class Dataset(tDataset):
                 if self.te:
                     self._t_id(s, s_id)
                     self._t_id(o, o_id)
-        return np.array(tups)
+        return np.array(tups).astype(np.int)
 
     @staticmethod
     def _first(x):
@@ -49,6 +51,44 @@ class Dataset(tDataset):
     @staticmethod
     def _second(x):
         return x[1]
+
+    def _h_ix(self, ds):
+        tr = pd.read_csv(f'data/{ds}/train.txt', sep='\t', names=['s', 'r', 'o', 't'])
+
+        r_e = tr[tr['o'].str.startswith('/repo/')][['o', 's']]
+        r_e = r_e.rename(columns={'o': 'repo', 's': 'entity'})
+
+        e_u = tr[tr['s'].str.startswith('/user/')].groupby('o')['s'].apply(list)
+        e_u = e_u.reset_index(name='users').rename(columns={'o': 'entity'})
+
+        r_u = r_e.merge(e_u, on='entity', how='left')[['repo', 'users']]
+        r_u['users'] = r_u.users.apply(lambda x: x if type(x) == list else [])
+        r_u = r_u.groupby('repo')['users'].apply(lambda x: list(itertools.chain.from_iterable(x)))
+        r_u = r_u.reset_index(name='users')
+
+        vd = pd.read_csv(f'data/{ds}/valid.txt', sep='\t', names=['s', 'r', 'o', 't'])
+        ts = pd.read_csv(f'data/{ds}/test.txt', sep='\t', names=['s', 'r', 'o', 't'])
+        al = pd.concat([tr, vd, ts])
+
+        i_r = al[al['o'].str.startswith('/repo/') & al['s'].str.startswith('/issue/')]
+        i_r = i_r.groupby('s')['o'].apply(lambda x: list(x)[0]).reset_index(name='repo')
+        i_r = i_r.rename(columns={'s': 'issue'})
+
+        p_r = al[al['o'].str.startswith('/repo/') & al['s'].str.startswith('/pr/')]
+        p_r = p_r.groupby('s')['o'].apply(lambda x: list(x)[0]).reset_index(name='repo')
+        p_r = p_r.rename(columns={'s': 'pr'})
+
+        i_u = i_r.merge(r_u, on='repo', how='left')[['issue', 'users']]
+        i_u['issue'] = i_u.issue.apply(lambda x: int(self.e2id[x]))
+        i_u['users'] = i_u.users.fillna('').apply(lambda x: [int(self.e2id[y]) for y in x])
+        i_u_ix = i_u.set_index('issue').to_dict()['users']
+
+        p_u = p_r.merge(r_u, on='repo', how='left')[['pr', 'users']]
+        p_u['pr'] = p_u.pr.apply(lambda x: int(self.e2id[x]))
+        p_u['users'] = p_u.users.fillna('').apply(lambda x: [int(self.e2id[y]) for y in x])
+        p_u_ix = p_u.set_index('pr').to_dict()['users']
+
+        return {**i_u_ix, **p_u_ix}
 
     def _ix(self):
         ix, s_ix = {}, {}
@@ -82,6 +122,9 @@ class Dataset(tDataset):
         self.vd = self._read(f'data/{args.dataset}/valid.txt')
         self.ts = self._read(f'data/{args.dataset}/test.txt')
         self.al = set(map(tuple, np.concatenate([self.tr, self.vd, self.ts]).tolist()))
+        self.he = args.he
+        if self.he:
+            self.h_ix = self._h_ix(args.dataset)
         self.ne = len(self.e2id)
         self.nr = len(self.r2id)
         self.ix = self._ix()
@@ -146,8 +189,9 @@ class Dataset(tDataset):
         e = T.tensor(tup[:, :, 1]).long()
         return t, e
 
-    def _filter(self, x, e, i):
-        return (x not in self.al) and (not self.te or (i in self.t2id[self.e2t[e]]))
+    def _filter(self, x, y, e, i):
+        return (x not in self.al) and (not self.te or i in self.t2id[self.e2t[y]]) and \
+            (not self.he or y not in self.h_ix.get(e, []) or i in self.h_ix.get(e, []))
 
     def __getitem__(self, i):
         if self.l_md == 'tr':
@@ -161,10 +205,10 @@ class Dataset(tDataset):
             x_ts, f = [], []
             if self.e_md in ['f', 's']:
                 x_ts.append(np.array([x, ] + [(i, r, o, y, m, d) for i in range(self.ne)]))
-                f.append(np.array([False, ] + [self._filter((i, r, o, y, m, d), s, i) for i in range(self.ne)]))
+                f.append(np.array([False, ] + [self._filter((i, r, o, y, m, d), s, o, i) for i in range(self.ne)]))
             if self.e_md in ['f', 'o']:
                 x_ts.append(np.array([x, ] + [(s, r, i, y, m, d) for i in range(self.ne)]))
-                f.append(np.array([False, ] + [self._filter((s, r, i, y, m, d), o, i) for i in range(self.ne)]))
+                f.append(np.array([False, ] + [self._filter((s, r, i, y, m, d), o, s, i) for i in range(self.ne)]))
             x_ts = np.concatenate(x_ts)
             f = np.concatenate(f)
             r_s, r_o = self._rel(x_ts)
