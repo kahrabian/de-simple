@@ -9,6 +9,7 @@ class DEDistMult(nn.Module):
     def __init__(self, ne, nr, args):
         super(DEDistMult, self).__init__()
         self.drp = args.drp
+        self.rel = args.r_dim > 0
 
         self.e_emb = nn.Embedding(ne, args.s_dim).to(args.dvc)
         self.r_emb = nn.Embedding(nr, args.s_dim + args.t_dim).to(args.dvc)
@@ -36,17 +37,19 @@ class DEDistMult(nn.Module):
         nn.init.xavier_uniform_(self.d_amp.weight)
         nn.init.xavier_uniform_(self.y_amp.weight)
 
-        self.p_emb = PositionalEmbedding(args.r_dim)
-        self.w_p = nn.Linear(nr, 1, bias=False)
-        nn.init.xavier_uniform_(self.w_p.weight)
-
-        self.w_r = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim))
-        nn.init.xavier_uniform_(self.w_r)
-
-        self.pr_emb = nn.Embedding(nr, args.r_dim).to(args.dvc)
-        nn.init.xavier_uniform_(self.pr_emb.weight)
-
         self.t_nl = T.sin
+
+        if self.rel:
+            self.p_emb = PositionalEmbedding(args.r_dim)
+
+            self.w_p = nn.Linear(nr, 1, bias=False)
+            nn.init.xavier_uniform_(self.w_p.weight)
+
+            self.w_r = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.r_dim))
+            nn.init.xavier_uniform_(self.w_r)
+
+            self.pr_emb = nn.Embedding(nr, args.r_dim).to(args.dvc)
+            nn.init.xavier_uniform_(self.pr_emb.weight)
 
     def t_emb(self, e, y, m, d):
         y_emb = self.y_amp(e) * self.t_nl(self.y_frq(e) * y + self.y_phi(e))
@@ -67,18 +70,20 @@ class DEDistMult(nn.Module):
     def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb, r_emb, o_emb = self.emb(s, r, o, y, m, d)
 
-        s_p_emb = self.p_emb(s_t.view(-1)).view(s_t.size(0), -1, s_t.size(1))
-        o_p_emb = self.p_emb(o_t.view(-1)).view(o_t.size(0), -1, o_t.size(1))
+        if self.rel:
+            s_p_emb = self.w_p(self.p_emb(s_t.view(-1)).view(s_t.size(0), -1, s_t.size(1))).squeeze()
+            o_p_emb = self.w_p(self.p_emb(o_t.view(-1)).view(o_t.size(0), -1, o_t.size(1))).squeeze()
 
-        p_emb_s = self.w_p(s_p_emb).squeeze()
-        p_emb_o = self.w_p(o_p_emb).squeeze()
+            w_r = T.index_select(self.w_r, dim=0, index=r)
 
-        w_r = T.index_select(self.w_r, dim=0, index=r)
-
-        sc = T.cat([(s_emb * r_emb) * o_emb,
-                    T.einsum('be,bpe->bp', (p_emb_s, w_r)) * o_emb,
-                    s_emb * T.einsum('be,bpe->bp', (p_emb_o, w_r)),
-                    p_emb_s * self.pr_emb(r) * p_emb_o], dim=1)
+            print(s_p_emb.size(), w_r.size(), o_emb.size())
+            exit()
+            sc = T.cat([(s_emb * r_emb) * o_emb,
+                        T.einsum('be,bpe->bp', (s_p_emb, w_r)) * o_emb,
+                        s_emb * T.einsum('be,bpe->bp', (o_p_emb, w_r)),
+                        s_p_emb * self.pr_emb(r) * o_p_emb], dim=1)
+        else:
+            sc = (s_emb * r_emb) * o_emb
         sc = F.dropout(sc, p=self.drp, training=self.training)
         sc = T.sum(sc, dim=1)
 

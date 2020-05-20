@@ -110,6 +110,7 @@ class Dataset(tDataset):
     def __init__(self, mem, args):
         self.l_md = 'tr'
         self.e_md = args.md
+        self.rel = args.r_dim > 0
         self.mem = mem
         self.nneg = args.nneg
         self.e2id = {}
@@ -170,6 +171,8 @@ class Dataset(tDataset):
         return r_e
 
     def _rel(self, neg):
+        if not self.rel:
+            return np.zeros((neg.shape[0], self.nr, 2)), np.zeros((neg.shape[0], self.nr, 2))
         t = list(map(self._rel_t_map, neg[:, -3:]))
         r_s = list(map(self._rel_e_map, zip(neg[:, 0], t)))
         r_o = list(map(self._rel_e_map, zip(neg[:, 2], t)))
