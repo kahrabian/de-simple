@@ -76,8 +76,6 @@ class DEDistMult(nn.Module):
 
             w_r = T.index_select(self.w_r, dim=0, index=r)
 
-            print(s_p_emb.size(), w_r.size(), o_emb.size())
-            exit()
             sc = T.cat([(s_emb * r_emb) * o_emb,
                         T.einsum('be,bpe->bp', (s_p_emb, w_r)) * o_emb,
                         s_emb * T.einsum('be,bpe->bp', (o_p_emb, w_r)),

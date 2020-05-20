@@ -53,12 +53,13 @@ class Runner(object):
                         ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
                         ls.backward()
                         opt.step()
-                        lr_sc.step()
                         avg_ls += ls.item()
                         self.tb_sw.add_scalar(f'epoch/loss/{e}', ls.item(), i)
                         self.tb_sw.add_scalar('train/loss', ls.item(), (e - 1) * len(dl) + i)
                         pb.set_postfix(loss=f'{avg_ls / i:.6f}')
                     pb.update()
+
+            lr_sc.step()
 
             self.save_mem()
             self.log_tensorboard('train', {'loss': avg_ls / len(dl)}, e)
