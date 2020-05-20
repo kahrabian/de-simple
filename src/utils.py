@@ -52,6 +52,7 @@ def args():
     parser.add_argument('-t_dim', type=int, default=64)
     parser.add_argument('-r_dim', type=int, default=16)
     parser.add_argument('-ne', type=int, default=500)
+    parser.add_argument('-we', type=int, default=250)
     parser.add_argument('-bs', type=int, default=512)
     parser.add_argument('-tbs', type=int, default=1)
     parser.add_argument('-lr', type=float, default=0.001)

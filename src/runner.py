@@ -8,6 +8,7 @@ import numpy as np
 import torch as T
 import torch.nn as nn
 import torch.multiprocessing as mp
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -33,6 +34,7 @@ class Runner(object):
 
     def train(self):
         opt = T.optim.Adam(self.mdl.parameters(), lr=self.args.lr)
+        lr_sc = StepLR(opt, self.args.we)
         ls_f = nn.CrossEntropyLoss()
 
         dl = DataLoader(self.ds, batch_size=self.args.bs, num_workers=self.args.w, pin_memory=True,
@@ -51,6 +53,7 @@ class Runner(object):
                         ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
                         ls.backward()
                         opt.step()
+                        lr_sc.step()
                         avg_ls += ls.item()
                         self.tb_sw.add_scalar(f'epoch/loss/{e}', ls.item(), i)
                         self.tb_sw.add_scalar('train/loss', ls.item(), (e - 1) * len(dl) + i)
