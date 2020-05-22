@@ -47,7 +47,7 @@ def args():
     parser.add_argument('-id', type=str, required=True)
     parser.add_argument('-dataset', type=str, required=True,
                         choices=['gdelt', 'icews14', 'icews05-15', 'GitGraph_TE_0.01', 'GitGraph_TI_0.01'])
-    parser.add_argument('-model', type=str, required=True, choices=['DEDistMult', 'DETransE', 'DESimplE'])
+    parser.add_argument('-model', type=str, required=True, choices=['DEDistMult', 'DETransE', 'DESimplE', 'TFDistMult'])
     parser.add_argument('-s_dim', type=int, default=20)
     parser.add_argument('-t_dim', type=int, default=64)
     parser.add_argument('-r_dim', type=int, default=16)

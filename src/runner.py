@@ -59,7 +59,8 @@ class Runner(object):
                         pb.set_postfix(loss=f'{avg_ls / i:.6f}')
                     pb.update()
 
-            lr_sc.step()
+            if not self.args.ch:
+                lr_sc.step()
 
             self.save_mem()
             self.log_tensorboard('train', {'loss': avg_ls / len(dl)}, e)
