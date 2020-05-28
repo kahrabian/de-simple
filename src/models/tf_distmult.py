@@ -11,10 +11,9 @@ class TFDistMult(nn.Module):
         self.drp = args.drp
 
         self.e_emb = nn.Embedding(ne, args.s_dim).to(args.dvc)
+        self.r_emb = nn.Embedding(nr, args.s_dim + args.t_dim).to(args.dvc)
         nn.init.xavier_uniform_(self.e_emb.weight)
-
-        self.w_r = nn.Parameter(T.zeros(nr, args.s_dim + args.t_dim, args.s_dim + args.t_dim)).to(args.dvc)
-        nn.init.xavier_uniform_(self.w_r)
+        nn.init.xavier_uniform_(self.r_emb.weight)
 
         self.m_frq = nn.Embedding(ne, args.t_dim).to(args.dvc)
         self.d_frq = nn.Embedding(ne, args.t_dim).to(args.dvc)
@@ -57,31 +56,32 @@ class TFDistMult(nn.Module):
 
         return y_emb + m_emb + d_emb
 
-    def emb(self, s, o, y, m, d):
+    def emb(self, s, r, o, y, m, d):
         y, m, d = y.view(-1, 1), m.view(-1, 1), d.view(-1, 1)
 
         s_emb = T.cat((self.e_emb(s), self.t_emb(s, y, m, d)), 1)
         o_emb = T.cat((self.e_emb(o), self.t_emb(o, y, m, d)), 1)
+        r_emb = self.r_emb(r)
 
-        return s_emb, o_emb
+        return s_emb, r_emb, o_emb
 
     def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
-        s_emb, o_emb = self.emb(s, o, y, m, d)
+        s_emb, r_emb, o_emb = self.emb(s, r, o, y, m, d)
 
-        w_r = T.index_select(self.w_r, dim=0, index=r)
-
-        s_p = self.p_emb(s_t.view(-1)).view(s_t.size(0), -1, s_t.size(1))
-        o_p = self.p_emb(o_t.view(-1)).view(o_t.size(0), -1, o_t.size(1))
+        s_p = self.p_emb(s_t.view(-1)).view(s_t.size(0), s_t.size(1), -1).permute(0, 2, 1)
+        o_p = self.p_emb(o_t.view(-1)).view(o_t.size(0), o_t.size(1), -1).permute(0, 2, 1)
 
         w_rp = T.index_select(self.w_rp, dim=0, index=r)
 
-        s_p_emb = T.einsum('bij,bjk->bik', (s_p, w_rp))
-        o_p_emb = T.einsum('bij,bjk->bik', (o_p, w_rp))
+        s_p_emb = s_p @ w_rp
+        o_p_emb = o_p @ w_rp
 
-        a = T.einsum('bij,bjk->bik', (T.einsum('bij,bjk->bik', (s_emb.unsqueeze(1), w_r)), o_emb.unsqueeze(2)))
-        b = T.einsum('bij,bjk->bik', ((self.e_emb(s) @ self.w_e).unsqueeze(1), s_p_emb))
-        c = T.einsum('bij,bjk->bik', ((self.e_emb(o) @ self.w_e).unsqueeze(1), o_p_emb))
-        d = T.einsum('bij,bjk->bik', (s_p_emb.permute(0, 2, 1) @ self.w_p, o_p_emb))
-        sc = (a + b + c + d).squeeze()
+        a = (s_emb * r_emb) * o_emb
+        b = ((self.e_emb(s) @ self.w_e) @ s_p_emb).squeeze()
+        c = ((self.e_emb(o) @ self.w_e) @ o_p_emb).squeeze()
+
+        sc = T.cat([a, b, c], dim=1)
+        sc = F.dropout(sc, p=self.drp, training=self.training)
+        sc = T.sum(sc, dim=1)
 
         return sc
