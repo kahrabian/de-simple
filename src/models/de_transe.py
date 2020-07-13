@@ -75,8 +75,8 @@ class DETransE(nn.Module):
         if self.r_dim > 0:
             s_r_emb, o_r_emb = self.e_r_emb(r, s_t), self.e_r_emb(r, o_t)
 
-            b = F.dropout(s_emb @ self.w_e - o_r_emb.squeeze(), p=self.drp, training=self.training).norm(dim=1)
-            c = F.dropout(s_r_emb.squeeze() - o_emb @ self.w_e, p=self.drp, training=self.training).norm(dim=1)
+            b = F.dropout(self.e_emb(s) @ self.w_e - o_r_emb.squeeze(), p=self.drp, training=self.training).norm(dim=1)
+            c = F.dropout(s_r_emb.squeeze() - self.e_emb(o) @ self.w_e, p=self.drp, training=self.training).norm(dim=1)
 
             return (-1) * (a + b + c)
 

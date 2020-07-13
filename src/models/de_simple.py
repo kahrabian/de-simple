@@ -118,12 +118,12 @@ class DESimplE(nn.Module):
             s_r_emb_s, o_r_emb_s = self.e_r_emb(r, s_t, self.w_rp_f), self.e_r_emb(r, o_t, self.w_rp_f)
             s_r_emb_o, o_r_emb_o = self.e_r_emb(r, s_t, self.w_rp_i), self.e_r_emb(r, o_t, self.w_rp_i)
 
-            b = ((s_emb_s.unsqueeze(1) @ self.w_e_s @ o_r_emb_o).squeeze() +
-                 (o_emb_s.unsqueeze(1) @ self.w_e_o @ s_r_emb_o).squeeze()) / 2.0
-            c = ((s_r_emb_s.permute(0, 2, 1) @ self.w_e_s.t() @ o_emb_o.unsqueeze(2)).squeeze() +
-                 (o_r_emb_s.permute(0, 2, 1) @ self.w_e_o.t() @ s_emb_o.unsqueeze(2)).squeeze()) / 2.0
-            d = ((s_r_emb_s.permute(0, 2, 1) @ self.w_p_s @ o_r_emb_o).squeeze() +
-                 (o_r_emb_s.permute(0, 2, 1) @ self.w_p_o @ s_r_emb_o).squeeze()) / 2.0
+            b = ((self.e_emb_s(s).unsqueeze(1) @ self.w_e_s @ o_r_emb_o).squeeze() +
+                 (self.e_emb_s(o).unsqueeze(1) @ self.w_e_o @ s_r_emb_o).squeeze()) / 2.0
+            c = ((s_r_emb_s.permute(0, 2, 1) @ self.w_e_s.t() @ self.e_emb_o(o).unsqueeze(2)).squeeze() +
+                 (o_r_emb_s.permute(0, 2, 1) @ self.w_e_o.t() @ self.e_emb_o(s).unsqueeze(2)).squeeze()) / 2.0
+            # d = ((s_r_emb_s.permute(0, 2, 1) @ self.w_p_s @ o_r_emb_o).squeeze() +
+            #      (o_r_emb_s.permute(0, 2, 1) @ self.w_p_o @ s_r_emb_o).squeeze()) / 2.0
 
             return a + b + c + d
 

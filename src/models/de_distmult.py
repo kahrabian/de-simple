@@ -77,9 +77,9 @@ class DEDistMult(nn.Module):
         if self.r_dim > 0:
             s_r_emb, o_r_emb = self.e_r_emb(r, s_t), self.e_r_emb(r, o_t)
 
-            b = (s_emb.unsqueeze(1) @ self.w_e @ o_r_emb).squeeze()
-            c = (s_r_emb.permute(0, 2, 1) @ self.w_e.t() @ o_emb.unsqueeze(2)).squeeze()
-            d = (s_r_emb.permute(0, 2, 1) @ self.w_p @ o_r_emb).squeeze()
+            b = (self.e_emb(s).unsqueeze(1) @ self.w_e @ o_r_emb).squeeze()
+            c = (s_r_emb.permute(0, 2, 1) @ self.w_e.t() @ self.e_emb(o).unsqueeze(2)).squeeze()
+            # d = (s_r_emb.permute(0, 2, 1) @ self.w_p @ o_r_emb).squeeze()
 
             return a + b + c + d
 
