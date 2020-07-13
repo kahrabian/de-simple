@@ -37,12 +37,13 @@ class DETransE(nn.Module):
         nn.init.xavier_uniform_(self.d_amp.weight)
         nn.init.xavier_uniform_(self.y_amp.weight)
 
-        self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
+        if self.r_dim > 0:
+            self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
 
-        self.w_e = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
-        self.w_rp = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
-        nn.init.xavier_uniform_(self.w_e)
-        nn.init.xavier_uniform_(self.w_rp)
+            self.w_e = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
+            self.w_rp = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
+            nn.init.xavier_uniform_(self.w_e)
+            nn.init.xavier_uniform_(self.w_rp)
 
         self.t_nl = T.sin
 
@@ -68,13 +69,18 @@ class DETransE(nn.Module):
 
     def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb, r_emb, o_emb = self.emb(s, r, o, y, m, d)
-        s_r_emb, o_r_emb = self.e_r_emb(r, s_t), self.e_r_emb(r, o_t)
 
         a = F.dropout((s_emb + r_emb) - o_emb, p=self.drp, training=self.training).norm(dim=1)
-        b = F.dropout(s_emb @ self.w_e - o_r_emb.squeeze(), p=self.drp, training=self.training).norm(dim=1)
-        c = F.dropout(s_r_emb.squeeze() - o_emb @ self.w_e, p=self.drp, training=self.training).norm(dim=1)
 
-        return (-1) * (a + b + c)
+        if self.r_dim > 0:
+            s_r_emb, o_r_emb = self.e_r_emb(r, s_t), self.e_r_emb(r, o_t)
+
+            b = F.dropout(s_emb @ self.w_e - o_r_emb.squeeze(), p=self.drp, training=self.training).norm(dim=1)
+            c = F.dropout(s_r_emb.squeeze() - o_emb @ self.w_e, p=self.drp, training=self.training).norm(dim=1)
+
+            return (-1) * (a + b + c)
+
+        return (-1) * a
 
     def l3_reg(self):
         return self.e_emb.weight.norm(p=3) ** 3 + \

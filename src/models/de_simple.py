@@ -59,19 +59,19 @@ class DESimplE(nn.Module):
         nn.init.xavier_uniform_(self.d_amp_o.weight)
         nn.init.xavier_uniform_(self.y_amp_o.weight)
 
-        self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
-
-        self.w_e_s = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
-        self.w_e_o = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
-        self.w_rp_f = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
-        self.w_rp_i = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
-        self.w_p_s = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
-        self.w_p_o = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
-        nn.init.xavier_uniform_(self.w_e_s)
-        nn.init.xavier_uniform_(self.w_e_o)
-        nn.init.xavier_uniform_(self.w_rp_f)
-        nn.init.xavier_uniform_(self.w_rp_i)
         if self.r_dim > 0:
+            self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
+
+            self.w_e_s = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
+            self.w_e_o = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
+            self.w_rp_f = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
+            self.w_rp_i = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
+            self.w_p_s = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
+            self.w_p_o = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
+            nn.init.xavier_uniform_(self.w_e_s)
+            nn.init.xavier_uniform_(self.w_e_o)
+            nn.init.xavier_uniform_(self.w_rp_f)
+            nn.init.xavier_uniform_(self.w_rp_i)
             nn.init.xavier_uniform_(self.w_p_s)
             nn.init.xavier_uniform_(self.w_p_o)
 
@@ -111,19 +111,23 @@ class DESimplE(nn.Module):
     def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb_s, r_emb_f, o_emb_o, o_emb_s, r_emb_i, s_emb_o = self.emb(s, r, o, y, m, d)
 
-        s_r_emb_s, o_r_emb_s = self.e_r_emb(r, s_t, self.w_rp_f), self.e_r_emb(r, o_t, self.w_rp_f)
-        s_r_emb_o, o_r_emb_o = self.e_r_emb(r, s_t, self.w_rp_i), self.e_r_emb(r, o_t, self.w_rp_i)
-
         a = F.dropout(((s_emb_s * r_emb_f) * o_emb_o +
                        (o_emb_s * r_emb_i) * s_emb_o) / 2.0, p=self.drp, training=self.training).sum(dim=1)
-        b = ((s_emb_s.unsqueeze(1) @ self.w_e_s @ o_r_emb_o).squeeze() +
-             (o_emb_s.unsqueeze(1) @ self.w_e_o @ s_r_emb_o).squeeze()) / 2.0
-        c = ((s_r_emb_s.permute(0, 2, 1) @ self.w_e_s.t() @ o_emb_o.unsqueeze(2)).squeeze() +
-             (o_r_emb_s.permute(0, 2, 1) @ self.w_e_o.t() @ s_emb_o.unsqueeze(2)).squeeze()) / 2.0
-        d = ((s_r_emb_s.permute(0, 2, 1) @ self.w_p_s @ o_r_emb_o).squeeze() +
-             (o_r_emb_s.permute(0, 2, 1) @ self.w_p_o @ s_r_emb_o).squeeze()) / 2.0
 
-        return a + b + c + d
+        if self.r_dim > 0:
+            s_r_emb_s, o_r_emb_s = self.e_r_emb(r, s_t, self.w_rp_f), self.e_r_emb(r, o_t, self.w_rp_f)
+            s_r_emb_o, o_r_emb_o = self.e_r_emb(r, s_t, self.w_rp_i), self.e_r_emb(r, o_t, self.w_rp_i)
+
+            b = ((s_emb_s.unsqueeze(1) @ self.w_e_s @ o_r_emb_o).squeeze() +
+                 (o_emb_s.unsqueeze(1) @ self.w_e_o @ s_r_emb_o).squeeze()) / 2.0
+            c = ((s_r_emb_s.permute(0, 2, 1) @ self.w_e_s.t() @ o_emb_o.unsqueeze(2)).squeeze() +
+                 (o_r_emb_s.permute(0, 2, 1) @ self.w_e_o.t() @ s_emb_o.unsqueeze(2)).squeeze()) / 2.0
+            d = ((s_r_emb_s.permute(0, 2, 1) @ self.w_p_s @ o_r_emb_o).squeeze() +
+                 (o_r_emb_s.permute(0, 2, 1) @ self.w_p_o @ s_r_emb_o).squeeze()) / 2.0
+
+            return a + b + c + d
+
+        return a
 
     def l3_reg(self):
         return self.e_emb_s.weight.norm(p=3) ** 3 + self.e_emb_o.weight.norm(p=3) ** 3 + \

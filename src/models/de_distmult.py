@@ -37,14 +37,14 @@ class DEDistMult(nn.Module):
         nn.init.xavier_uniform_(self.d_amp.weight)
         nn.init.xavier_uniform_(self.y_amp.weight)
 
-        self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
-
-        self.w_e = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
-        self.w_rp = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
-        self.w_p = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
-        nn.init.xavier_uniform_(self.w_e)
-        nn.init.xavier_uniform_(self.w_rp)
         if self.r_dim > 0:
+            self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
+
+            self.w_e = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
+            self.w_rp = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
+            self.w_p = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
+            nn.init.xavier_uniform_(self.w_e)
+            nn.init.xavier_uniform_(self.w_rp)
             nn.init.xavier_uniform_(self.w_p)
 
         self.t_nl = T.sin
@@ -71,14 +71,19 @@ class DEDistMult(nn.Module):
 
     def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb, r_emb, o_emb = self.emb(s, r, o, y, m, d)
-        s_r_emb, o_r_emb = self.e_r_emb(r, s_t), self.e_r_emb(r, o_t)
 
         a = F.dropout((s_emb * r_emb) * o_emb, p=self.drp, training=self.training).sum(dim=1)
-        b = (s_emb.unsqueeze(1) @ self.w_e @ o_r_emb).squeeze()
-        c = (s_r_emb.permute(0, 2, 1) @ self.w_e.t() @ o_emb.unsqueeze(2)).squeeze()
-        d = (s_r_emb.permute(0, 2, 1) @ self.w_p @ o_r_emb).squeeze()
 
-        return a + b + c + d
+        if self.r_dim > 0:
+            s_r_emb, o_r_emb = self.e_r_emb(r, s_t), self.e_r_emb(r, o_t)
+
+            b = (s_emb.unsqueeze(1) @ self.w_e @ o_r_emb).squeeze()
+            c = (s_r_emb.permute(0, 2, 1) @ self.w_e.t() @ o_emb.unsqueeze(2)).squeeze()
+            d = (s_r_emb.permute(0, 2, 1) @ self.w_p @ o_r_emb).squeeze()
+
+            return a + b + c + d
+
+        return a
 
     def l3_reg(self):
         return self.e_emb.weight.norm(p=3) ** 3 + \
