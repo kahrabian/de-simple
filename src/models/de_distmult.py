@@ -40,7 +40,7 @@ class DEDistMult(nn.Module):
         if self.r_dim > 0:
             self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
 
-            self.w_e = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
+            self.w_e = nn.Parameter(T.zeros(args.s_dim, self.r_dim)).to(args.dvc)
             self.w_rp = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
             self.w_p = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
             nn.init.xavier_uniform_(self.w_e)
