@@ -56,6 +56,7 @@ def args():
     parser.add_argument('-bs', type=int, default=512)
     parser.add_argument('-tbs', type=int, default=1)
     parser.add_argument('-lr', type=float, default=0.001)
+    parser.add_argument('-lm', type=float, default=0.0)
     parser.add_argument('-nneg', type=int, default=500)
     parser.add_argument('-drp', type=float, default=0.4)
     parser.add_argument('-vd_stp', type=int, default=20)

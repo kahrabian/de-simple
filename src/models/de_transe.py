@@ -2,11 +2,14 @@ import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
 
+from src.models.embedding import PositionalEmbedding
+
 
 class DETransE(nn.Module):
     def __init__(self, ne, nr, args):
         super(DETransE, self).__init__()
         self.drp = args.drp
+        self.r_dim = args.r_dim
 
         self.e_emb = nn.Embedding(ne, args.s_dim).to(args.dvc)
         self.r_emb = nn.Embedding(nr, args.s_dim + args.t_dim).to(args.dvc)
@@ -34,6 +37,13 @@ class DETransE(nn.Module):
         nn.init.xavier_uniform_(self.d_amp.weight)
         nn.init.xavier_uniform_(self.y_amp.weight)
 
+        self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
+
+        self.w_e = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
+        self.w_rp = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
+        nn.init.xavier_uniform_(self.w_e)
+        nn.init.xavier_uniform_(self.w_rp)
+
         self.t_nl = T.sin
 
     def t_emb(self, e, y, m, d):
@@ -52,11 +62,22 @@ class DETransE(nn.Module):
 
         return s_emb, r_emb, o_emb
 
+    def e_r_emb(self, r, e_t):
+        e_r = self.p_emb(e_t.view(-1)).view(e_t.size(0), e_t.size(1), self.r_dim).permute(0, 2, 1)
+        return e_r @ T.index_select(self.w_rp, dim=0, index=r.long())
+
     def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb, r_emb, o_emb = self.emb(s, r, o, y, m, d)
+        s_r_emb, o_r_emb = self.e_r_emb(r, s_t), self.e_r_emb(r, o_t)
 
-        sc = (s_emb + r_emb) - o_emb
-        sc = F.dropout(sc, p=self.drp, training=self.training)
-        sc = (-1) * T.norm(sc, dim=1)
+        a = F.dropout((s_emb + r_emb) - o_emb, p=self.drp, training=self.training).norm(dim=1)
+        b = F.dropout(s_emb @ self.w_e - o_r_emb.squeeze(), p=self.drp, training=self.training).norm(dim=1)
+        c = F.dropout(s_r_emb.squeeze() - o_emb @ self.w_e, p=self.drp, training=self.training).norm(dim=1)
 
-        return sc
+        return (-1) * (a + b + c)
+
+    def l3_reg(self):
+        return self.e_emb.weight.norm(p=3) ** 3 + \
+            self.m_amp.weight.norm(p=3) ** 3 + \
+            self.d_amp.weight.norm(p=3) ** 3 + \
+            self.y_amp.weight.norm(p=3) ** 3

@@ -9,6 +9,7 @@ class DESimplE(nn.Module):
     def __init__(self, ne, nr, args):
         super(DESimplE, self).__init__()
         self.drp = args.drp
+        self.r_dim = args.r_dim
 
         self.e_emb_s = nn.Embedding(ne, args.s_dim).to(args.dvc)
         self.e_emb_o = nn.Embedding(ne, args.s_dim).to(args.dvc)
@@ -58,6 +59,21 @@ class DESimplE(nn.Module):
         nn.init.xavier_uniform_(self.d_amp_o.weight)
         nn.init.xavier_uniform_(self.y_amp_o.weight)
 
+        self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
+
+        self.w_e_s = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
+        self.w_e_o = nn.Parameter(T.zeros(args.s_dim + args.t_dim, self.r_dim)).to(args.dvc)
+        self.w_rp_f = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
+        self.w_rp_i = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
+        self.w_p_s = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
+        self.w_p_o = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
+        nn.init.xavier_uniform_(self.w_e_s)
+        nn.init.xavier_uniform_(self.w_e_o)
+        nn.init.xavier_uniform_(self.w_rp_f)
+        nn.init.xavier_uniform_(self.w_rp_i)
+        nn.init.xavier_uniform_(self.w_p_s)
+        nn.init.xavier_uniform_(self.w_p_o)
+
         self.t_nl = T.sin
 
     def t_emb_s(self, e, y, m, d):
@@ -87,11 +103,29 @@ class DESimplE(nn.Module):
 
         return s_emb_s, r_emb_f, o_emb_o, o_emb_s, r_emb_i, s_emb_o
 
+    def e_r_emb(self, r, e_t, w_rp):
+        e_r = self.p_emb(e_t.view(-1)).view(e_t.size(0), e_t.size(1), self.r_dim).permute(0, 2, 1)
+        return e_r @ T.index_select(w_rp, dim=0, index=r.long())
+
     def forward(self, s, r, o, y, m, d, s_t, s_e, o_t, o_e):
         s_emb_s, r_emb_f, o_emb_o, o_emb_s, r_emb_i, s_emb_o = self.emb(s, r, o, y, m, d)
 
-        sc = ((s_emb_s * r_emb_f) * o_emb_o + (o_emb_s * r_emb_i) * s_emb_o) / 2.0
-        sc = F.dropout(sc, p=self.drp, training=self.training)
-        sc = T.sum(sc, dim=1)
+        s_r_emb_s, o_r_emb_s = self.e_r_emb(r, s_t, self.w_rp_f), self.e_r_emb(r, o_t, self.w_rp_f)
+        s_r_emb_o, o_r_emb_o = self.e_r_emb(r, s_t, self.w_rp_i), self.e_r_emb(r, o_t, self.w_rp_i)
 
-        return sc
+        a = F.dropout(((s_emb_s * r_emb_f) * o_emb_o +
+                       (o_emb_s * r_emb_i) * s_emb_o) / 2.0, p=self.drp, training=self.training).sum(dim=1)
+        b = ((s_emb_s.unsqueeze(1) @ self.w_e_s @ o_r_emb_o).squeeze() +
+             (o_emb_s.unsqueeze(1) @ self.w_e_o @ s_r_emb_o).squeeze()) / 2.0
+        c = ((s_r_emb_s.permute(0, 2, 1) @ self.w_e_s.t() @ o_emb_o.unsqueeze(2)).squeeze() +
+             (o_r_emb_s.permute(0, 2, 1) @ self.w_e_o.t() @ s_emb_o.unsqueeze(2)).squeeze()) / 2.0
+        d = ((s_r_emb_s.permute(0, 2, 1) @ self.w_p_s @ o_r_emb_o).squeeze() +
+             (o_r_emb_s.permute(0, 2, 1) @ self.w_p_o @ s_r_emb_o).squeeze()) / 2.0
+
+        return a + b + c + d
+
+    def l3_reg(self):
+        return self.e_emb_s.weight.norm(p=3) ** 3 + self.e_emb_o.weight.norm(p=3) ** 3 + \
+            self.m_amp_s.weight.norm(p=3) ** 3 + self.m_amp_o.weight.norm(p=3) ** 3 + \
+            self.d_amp_s.weight.norm(p=3) ** 3 + self.d_amp_o.weight.norm(p=3) ** 3 + \
+            self.y_amp_s.weight.norm(p=3) ** 3 + self.y_amp_o.weight.norm(p=3) ** 3

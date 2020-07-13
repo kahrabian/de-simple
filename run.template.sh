@@ -12,16 +12,17 @@
 source ${VENVDIR}/gg/bin/activate
 
 python main.py -id ${SLURM_JOB_ID} \
-    -dataset icews14 \
+    -dataset DS \
     -model DEDistMult \
-    -s_dim 20 \
-    -t_dim 64 \
-    -r_dim 16 \
+    -s_dim SD \
+    -t_dim TD \
+    -r_dim RD \
     -ne 500 \
     -we 250 \
     -bs 512 \
     -tbs 1 \
     -lr 0.001 \
+    -lm 0.0 \
     -nneg 500 \
     -drp 0.4 \
     -vd_stp 20 \

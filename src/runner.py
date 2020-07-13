@@ -43,7 +43,7 @@ class Runner(object):
             self.mdl.train()
             self.ds.train()
 
-            avg_ls = 0.0
+            avg_ls, avg_rg = 0.0, 0.0
             with tqdm(total=len(dl), desc=f'epoch {e}/{self.args.ne}') as pb:
                 for i, x in enumerate(dl, 1):
                     if not self.args.ch:
@@ -51,11 +51,16 @@ class Runner(object):
                         s, r, o, y, m, d, s_t, s_e, o_t, o_e = ut.to(self.args.dvc, x)
                         sc = self.mdl(s, r, o, y, m, d, s_t, s_e, o_t, o_e).view(-1, self.args.nneg + 1)
                         ls = ls_f(sc, T.zeros(sc.size(0)).long().to(self.args.dvc))
+                        rg = self.args.lm * self.mdl.module.l3_reg()
+                        ls += rg
                         ls.backward()
                         opt.step()
                         avg_ls += ls.item()
+                        avg_ls += rg.item()
                         self.tb_sw.add_scalar(f'epoch/loss/{e}', ls.item(), i)
+                        self.tb_sw.add_scalar(f'epoch/regu/{e}', rg.item(), i)
                         self.tb_sw.add_scalar('train/loss', ls.item(), (e - 1) * len(dl) + i)
+                        self.tb_sw.add_scalar('train/regu', rg.item(), (e - 1) * len(dl) + i)
                         pb.set_postfix(loss=f'{avg_ls / i:.6f}')
                     pb.update()
 
