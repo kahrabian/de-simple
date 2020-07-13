@@ -44,7 +44,8 @@ class DEDistMult(nn.Module):
         self.w_p = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
         nn.init.xavier_uniform_(self.w_e)
         nn.init.xavier_uniform_(self.w_rp)
-        nn.init.xavier_uniform_(self.w_p)
+        if self.r_dim > 0:
+            nn.init.xavier_uniform_(self.w_p)
 
         self.t_nl = T.sin
 

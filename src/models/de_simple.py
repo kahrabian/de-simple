@@ -71,8 +71,9 @@ class DESimplE(nn.Module):
         nn.init.xavier_uniform_(self.w_e_o)
         nn.init.xavier_uniform_(self.w_rp_f)
         nn.init.xavier_uniform_(self.w_rp_i)
-        nn.init.xavier_uniform_(self.w_p_s)
-        nn.init.xavier_uniform_(self.w_p_o)
+        if self.r_dim > 0:
+            nn.init.xavier_uniform_(self.w_p_s)
+            nn.init.xavier_uniform_(self.w_p_o)
 
         self.t_nl = T.sin
 
