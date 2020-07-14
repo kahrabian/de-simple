@@ -1,9 +1,9 @@
 #!/bin/sh
 #SBATCH --account=def-jinguo
-#SBATCH --job-name=de-simple
-#SBATCH --gres=gpu:4
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=64G
+#SBATCH --job-name=de-simple-DS-SD-TD-RD
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128G
 #SBATCH --time=72:00:00
 #SBATCH --output=./logs/%x-%j.out
 #SBATCH --mail-type=ALL
@@ -20,14 +20,14 @@ python main.py -id ${SLURM_JOB_ID} \
     -ne 500 \
     -we 250 \
     -bs 512 \
-    -tbs 1 \
+    -tbs 8 \
     -lr 0.001 \
     -lm 0.0 \
     -nneg 500 \
     -drp 0.4 \
     -vd_stp 20 \
     -mtr mrr \
-    -w 1 \
+    -w 32 \
     -tr -vd -ts \
     -md f \
-    -te -he
+    -mm

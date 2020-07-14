@@ -22,7 +22,7 @@ from src.dataset import Dataset
 class Runner(object):
     def __init__(self, args):
         self.args = args
-        self.mem = self.load_mem()
+        self.mem = self.load_mem() if args.mm else None
         self.ds = Dataset(self.mem, self.args)
         self.mdl = nn.DataParallel(getattr(models, self.args.model)(self.ds.ne, self.ds.nr, self.args))
         self.mtrs = ut.Metric()

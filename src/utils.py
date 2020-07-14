@@ -68,6 +68,7 @@ def args():
     parser.add_argument('-vd', action='store_true')
     parser.add_argument('-ts', action='store_true')
     parser.add_argument('-ch', action='store_true')
+    parser.add_argument('-mm', action='store_true')
     parser.add_argument('-w', type=int, default=0)
 
     return parser.parse_args()
