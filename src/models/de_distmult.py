@@ -11,38 +11,38 @@ class DEDistMult(nn.Module):
         self.drp = args.drp
         self.r_dim = args.r_dim
 
-        self.e_emb = nn.Embedding(ne, args.s_dim).to(args.dvc)
-        self.r_emb = nn.Embedding(nr, args.s_dim + args.t_dim).to(args.dvc)
+        self.e_emb = nn.Embedding(ne, args.s_dim)
+        self.r_emb = nn.Embedding(nr, args.s_dim + args.t_dim)
         nn.init.xavier_uniform_(self.e_emb.weight)
         nn.init.xavier_uniform_(self.r_emb.weight)
 
-        self.m_frq = nn.Embedding(ne, args.t_dim).to(args.dvc)
-        self.d_frq = nn.Embedding(ne, args.t_dim).to(args.dvc)
-        self.y_frq = nn.Embedding(ne, args.t_dim).to(args.dvc)
+        self.m_frq = nn.Embedding(ne, args.t_dim)
+        self.d_frq = nn.Embedding(ne, args.t_dim)
+        self.y_frq = nn.Embedding(ne, args.t_dim)
         nn.init.xavier_uniform_(self.m_frq.weight)
         nn.init.xavier_uniform_(self.d_frq.weight)
         nn.init.xavier_uniform_(self.y_frq.weight)
 
-        self.m_phi = nn.Embedding(ne, args.t_dim).to(args.dvc)
-        self.d_phi = nn.Embedding(ne, args.t_dim).to(args.dvc)
-        self.y_phi = nn.Embedding(ne, args.t_dim).to(args.dvc)
+        self.m_phi = nn.Embedding(ne, args.t_dim)
+        self.d_phi = nn.Embedding(ne, args.t_dim)
+        self.y_phi = nn.Embedding(ne, args.t_dim)
         nn.init.xavier_uniform_(self.m_phi.weight)
         nn.init.xavier_uniform_(self.d_phi.weight)
         nn.init.xavier_uniform_(self.y_phi.weight)
 
-        self.m_amp = nn.Embedding(ne, args.t_dim).to(args.dvc)
-        self.d_amp = nn.Embedding(ne, args.t_dim).to(args.dvc)
-        self.y_amp = nn.Embedding(ne, args.t_dim).to(args.dvc)
+        self.m_amp = nn.Embedding(ne, args.t_dim)
+        self.d_amp = nn.Embedding(ne, args.t_dim)
+        self.y_amp = nn.Embedding(ne, args.t_dim)
         nn.init.xavier_uniform_(self.m_amp.weight)
         nn.init.xavier_uniform_(self.d_amp.weight)
         nn.init.xavier_uniform_(self.y_amp.weight)
 
         if self.r_dim > 0:
-            self.p_emb = PositionalEmbedding(self.r_dim).to(args.dvc)
+            self.p_emb = PositionalEmbedding(self.r_dim)
 
-            self.w_e = nn.Parameter(T.zeros(args.s_dim, self.r_dim)).to(args.dvc)
-            self.w_rp = nn.Parameter(T.zeros(nr, nr, 1)).to(args.dvc)
-            self.w_p = nn.Parameter(T.zeros(self.r_dim, self.r_dim)).to(args.dvc)
+            self.w_e = nn.Parameter(T.zeros(args.s_dim, self.r_dim))
+            self.w_rp = nn.Parameter(T.zeros(nr, nr, 1))
+            self.w_p = nn.Parameter(T.zeros(self.r_dim, self.r_dim))
             nn.init.xavier_uniform_(self.w_e)
             nn.init.xavier_uniform_(self.w_rp)
             nn.init.xavier_uniform_(self.w_p)
