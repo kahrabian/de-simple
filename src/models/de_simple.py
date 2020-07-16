@@ -9,6 +9,7 @@ class DESimplE(nn.Module):
     def __init__(self, ne, nr, args):
         super(DESimplE, self).__init__()
         self.drp = args.drp
+        self.t_dim = args.t_dim
         self.r_dim = args.r_dim
 
         self.e_emb_s = nn.Embedding(ne, args.s_dim)
@@ -20,44 +21,47 @@ class DESimplE(nn.Module):
         nn.init.xavier_uniform_(self.r_emb_f.weight)
         nn.init.xavier_uniform_(self.r_emb_i.weight)
 
-        self.m_frq_s = nn.Embedding(ne, args.t_dim)
-        self.m_frq_o = nn.Embedding(ne, args.t_dim)
-        self.d_frq_s = nn.Embedding(ne, args.t_dim)
-        self.d_frq_o = nn.Embedding(ne, args.t_dim)
-        self.y_frq_s = nn.Embedding(ne, args.t_dim)
-        self.y_frq_o = nn.Embedding(ne, args.t_dim)
-        nn.init.xavier_uniform_(self.m_frq_s.weight)
-        nn.init.xavier_uniform_(self.d_frq_s.weight)
-        nn.init.xavier_uniform_(self.y_frq_s.weight)
-        nn.init.xavier_uniform_(self.m_frq_o.weight)
-        nn.init.xavier_uniform_(self.d_frq_o.weight)
-        nn.init.xavier_uniform_(self.y_frq_o.weight)
+        if self.t_dim > 0:
+            self.m_frq_s = nn.Embedding(ne, args.t_dim)
+            self.m_frq_o = nn.Embedding(ne, args.t_dim)
+            self.d_frq_s = nn.Embedding(ne, args.t_dim)
+            self.d_frq_o = nn.Embedding(ne, args.t_dim)
+            self.y_frq_s = nn.Embedding(ne, args.t_dim)
+            self.y_frq_o = nn.Embedding(ne, args.t_dim)
+            nn.init.xavier_uniform_(self.m_frq_s.weight)
+            nn.init.xavier_uniform_(self.d_frq_s.weight)
+            nn.init.xavier_uniform_(self.y_frq_s.weight)
+            nn.init.xavier_uniform_(self.m_frq_o.weight)
+            nn.init.xavier_uniform_(self.d_frq_o.weight)
+            nn.init.xavier_uniform_(self.y_frq_o.weight)
 
-        self.m_phi_s = nn.Embedding(ne, args.t_dim)
-        self.m_phi_o = nn.Embedding(ne, args.t_dim)
-        self.d_phi_s = nn.Embedding(ne, args.t_dim)
-        self.d_phi_o = nn.Embedding(ne, args.t_dim)
-        self.y_phi_s = nn.Embedding(ne, args.t_dim)
-        self.y_phi_o = nn.Embedding(ne, args.t_dim)
-        nn.init.xavier_uniform_(self.m_phi_s.weight)
-        nn.init.xavier_uniform_(self.d_phi_s.weight)
-        nn.init.xavier_uniform_(self.y_phi_s.weight)
-        nn.init.xavier_uniform_(self.m_phi_o.weight)
-        nn.init.xavier_uniform_(self.d_phi_o.weight)
-        nn.init.xavier_uniform_(self.y_phi_o.weight)
+            self.m_phi_s = nn.Embedding(ne, args.t_dim)
+            self.m_phi_o = nn.Embedding(ne, args.t_dim)
+            self.d_phi_s = nn.Embedding(ne, args.t_dim)
+            self.d_phi_o = nn.Embedding(ne, args.t_dim)
+            self.y_phi_s = nn.Embedding(ne, args.t_dim)
+            self.y_phi_o = nn.Embedding(ne, args.t_dim)
+            nn.init.xavier_uniform_(self.m_phi_s.weight)
+            nn.init.xavier_uniform_(self.d_phi_s.weight)
+            nn.init.xavier_uniform_(self.y_phi_s.weight)
+            nn.init.xavier_uniform_(self.m_phi_o.weight)
+            nn.init.xavier_uniform_(self.d_phi_o.weight)
+            nn.init.xavier_uniform_(self.y_phi_o.weight)
 
-        self.m_amp_s = nn.Embedding(ne, args.t_dim)
-        self.m_amp_o = nn.Embedding(ne, args.t_dim)
-        self.d_amp_s = nn.Embedding(ne, args.t_dim)
-        self.d_amp_o = nn.Embedding(ne, args.t_dim)
-        self.y_amp_s = nn.Embedding(ne, args.t_dim)
-        self.y_amp_o = nn.Embedding(ne, args.t_dim)
-        nn.init.xavier_uniform_(self.m_amp_s.weight)
-        nn.init.xavier_uniform_(self.d_amp_s.weight)
-        nn.init.xavier_uniform_(self.y_amp_s.weight)
-        nn.init.xavier_uniform_(self.m_amp_o.weight)
-        nn.init.xavier_uniform_(self.d_amp_o.weight)
-        nn.init.xavier_uniform_(self.y_amp_o.weight)
+            self.m_amp_s = nn.Embedding(ne, args.t_dim)
+            self.m_amp_o = nn.Embedding(ne, args.t_dim)
+            self.d_amp_s = nn.Embedding(ne, args.t_dim)
+            self.d_amp_o = nn.Embedding(ne, args.t_dim)
+            self.y_amp_s = nn.Embedding(ne, args.t_dim)
+            self.y_amp_o = nn.Embedding(ne, args.t_dim)
+            nn.init.xavier_uniform_(self.m_amp_s.weight)
+            nn.init.xavier_uniform_(self.d_amp_s.weight)
+            nn.init.xavier_uniform_(self.y_amp_s.weight)
+            nn.init.xavier_uniform_(self.m_amp_o.weight)
+            nn.init.xavier_uniform_(self.d_amp_o.weight)
+            nn.init.xavier_uniform_(self.y_amp_o.weight)
+
+            self.t_nl = T.sin
 
         if self.r_dim > 0:
             self.p_emb = PositionalEmbedding(self.r_dim)
@@ -74,8 +78,6 @@ class DESimplE(nn.Module):
             nn.init.xavier_uniform_(self.w_rp_i)
             nn.init.xavier_uniform_(self.w_p_s)
             nn.init.xavier_uniform_(self.w_p_o)
-
-        self.t_nl = T.sin
 
     def t_emb_s(self, e, y, m, d):
         y_emb = self.y_amp_s(e) * self.t_nl(self.y_frq_s(e) * y + self.y_phi_s(e))
@@ -94,12 +96,20 @@ class DESimplE(nn.Module):
     def emb(self, s, r, o, y, m, d):
         y, m, d = y.view(-1, 1), m.view(-1, 1), d.view(-1, 1)
 
-        s_emb_s = T.cat((self.e_emb_s(s), self.t_emb_s(s, y, m, d)), 1)
-        o_emb_o = T.cat((self.e_emb_o(o), self.t_emb_o(o, y, m, d)), 1)
+        if self.t_dim > 0:
+            s_emb_s = T.cat((self.e_emb_s(s), self.t_emb_s(s, y, m, d)), 1)
+            o_emb_o = T.cat((self.e_emb_o(o), self.t_emb_o(o, y, m, d)), 1)
+        else:
+            s_emb_s = self.e_emb_s(s)
+            o_emb_o = self.e_emb_o(o)
         r_emb_f = self.r_emb_f(r)
 
-        o_emb_s = T.cat((self.e_emb_s(o), self.t_emb_s(o, y, m, d)), 1)
-        s_emb_o = T.cat((self.e_emb_o(s), self.t_emb_o(s, y, m, d)), 1)
+        if self.t_dim > 0:
+            o_emb_s = T.cat((self.e_emb_s(o), self.t_emb_s(o, y, m, d)), 1)
+            s_emb_o = T.cat((self.e_emb_o(s), self.t_emb_o(s, y, m, d)), 1)
+        else:
+            o_emb_s = self.e_emb_s(o)
+            s_emb_o = self.e_emb_o(s)
         r_emb_i = self.r_emb_i(r)
 
         return s_emb_s, r_emb_f, o_emb_o, o_emb_s, r_emb_i, s_emb_o
