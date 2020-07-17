@@ -140,7 +140,10 @@ class DESimplE(nn.Module):
         return a
 
     def l3_reg(self):
-        return self.e_emb_s.weight.norm(p=3) ** 3 + self.e_emb_o.weight.norm(p=3) ** 3 + \
-            self.m_amp_s.weight.norm(p=3) ** 3 + self.m_amp_o.weight.norm(p=3) ** 3 + \
-            self.d_amp_s.weight.norm(p=3) ** 3 + self.d_amp_o.weight.norm(p=3) ** 3 + \
-            self.y_amp_s.weight.norm(p=3) ** 3 + self.y_amp_o.weight.norm(p=3) ** 3
+        if self.t_dim > 0:
+            return self.e_emb_s.weight.norm(p=3) ** 3 + self.e_emb_o.weight.norm(p=3) ** 3 + \
+                self.m_amp_s.weight.norm(p=3) ** 3 + self.m_amp_o.weight.norm(p=3) ** 3 + \
+                self.d_amp_s.weight.norm(p=3) ** 3 + self.d_amp_o.weight.norm(p=3) ** 3 + \
+                self.y_amp_s.weight.norm(p=3) ** 3 + self.y_amp_o.weight.norm(p=3) ** 3
+        else:
+            return self.e_emb_s.weight.norm(p=3) ** 3 + self.e_emb_o.weight.norm(p=3) ** 3
