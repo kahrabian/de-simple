@@ -148,9 +148,9 @@ class Dataset(tDataset):
         o_neg = np.repeat(pos, nneg + 1, axis=0)
         s_rnd = np.random.randint(1, self.ne, size=s_neg.shape[0])
         o_rnd = np.random.randint(1, self.ne, size=o_neg.shape[0])
-        for i in range(s_neg.shape[0] // (nneg + 1)):
-            s_rnd[i * (nneg + 1)] = 0
-            o_rnd[i * (nneg + 1)] = 0
+        _ix = np.arange(0, s_neg.shape[0], (nneg + 1))
+        s_rnd[_ix] = 0
+        o_rnd[_ix] = 0
         s_neg[:, 0] = (s_neg[:, 0] + s_rnd) % self.ne
         o_neg[:, 2] = (o_neg[:, 2] + o_rnd) % self.ne
         return np.concatenate((s_neg, o_neg), axis=0)
